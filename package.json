@@ -1,0 +1,91 @@
+{
+  "name": "nanquim",
+  "version": "1.2.2",
+  "description": "Navegador Nanquim: rápido, com bloqueador, painéis laterais e visual de nanquim.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir",
+    "dist:linux-installer": "electron-builder --win --dir && cd build && makensis -INPUTCHARSET UTF8 -DVERSION=$npm_package_version installer.nsi && cd .. && node build/make-latest.js"
+  },
+  "author": "Felipe Misso",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^44.9.3",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "productName": "Nanquim",
+  "build": {
+    "appId": "com.felipemisso.nanquim",
+    "productName": "Nanquim",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "artifactName": "Nanquim-${version}-win.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nanquim",
+      "installerLanguages": [
+        "pt_BR"
+      ],
+      "language": "1046",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "artifactName": "Nanquim-Setup-${version}.${ext}"
+    },
+    "protocols": [
+      {
+        "name": "Página da web",
+        "schemes": [
+          "http",
+          "https"
+        ]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "html",
+          "htm"
+        ],
+        "name": "Página HTML",
+        "role": "Viewer"
+      }
+    ],
+    "afterPack": "build/afterPack.js",
+    "portable": {
+      "artifactName": "Nanquim-Portatil-${version}.${ext}"
+    },
+    "electronLanguages": [
+      "pt-BR",
+      "en-US"
+    ]
+  },
+  "repository": "github:xpsy6/nanquim",
+  "dependencies": {
+    "electron-updater": "^6.8.10"
+  }
+}

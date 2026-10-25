@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'">
+  <title>alca</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+    #h { position: absolute; top: 0; bottom: 0; left: 0; width: 16px; display: flex; align-items: center; justify-content: center; cursor: ew-resize; }
+    #h i {
+      width: 4px; height: 46px; border-radius: 3px;
+      background: rgba(140, 132, 120, .7); box-shadow: 0 0 0 1px rgba(0, 0, 0, .3);
+      transition: background .15s, height .25s cubic-bezier(.22, .9, .28, 1.08), width .15s;
+    }
+    #h:hover i { background: var(--accent, #e0452b); height: 70px; width: 5px; }
+    body.drag { cursor: ew-resize; }
+    body.drag #h { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <div id="h" title="Arraste para mudar a largura. Clique duas vezes para voltar ao padrão."><i></i></div>
+  <script src="grip.js"></script>
+</body>
+</html>

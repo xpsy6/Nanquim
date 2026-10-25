@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>Favoritos</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .add-form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; margin-bottom: 18px; padding: 14px; border-radius: 14px; background: var(--s1); animation: rise .3s var(--out); }
+    .row .edit { flex: 1; display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
+    .row .edit .field { height: 32px; font-size: 13px; }
+    .row.editing { background: var(--s1); }
+    .count { font-size: 12.5px; color: var(--muted); margin: -8px 0 10px 10px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <h1 class="page-title">Favoritos</h1>
+      <span class="page-sub">Aparecem na barra embaixo do endereço.</span>
+      <div class="head-actions">
+        <button class="btn primary" id="add"><span data-i="plus"></span>Adicionar</button>
+        <button class="btn" id="import">Importar</button>
+        <button class="btn" id="export">Exportar</button>
+      </div>
+    </header>
+    <form class="add-form" id="add-form" hidden>
+      <input class="field" id="f-title" placeholder="Nome">
+      <input class="field" id="f-url" placeholder="Endereço" required>
+      <button class="btn primary" type="submit">Salvar</button>
+      <button class="btn ghost" type="button" id="f-cancel">Cancelar</button>
+    </form>
+    <div class="searchbar">
+      <span data-i="search"></span>
+      <input class="field" id="q" placeholder="Pesquisar nos favoritos" spellcheck="false">
+    </div>
+    <div class="count" id="count"></div>
+    <div id="list"></div>
+  </div>
+  <script src="common.js"></script>
+  <script src="bookmarks.js"></script>
+</body>
+</html>

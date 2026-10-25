@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>Configurações</title>
+  <link rel="stylesheet" href="pages.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="layout">
+    <nav class="side" id="side">
+      <div class="side-title">Configurações</div>
+      <a href="#aparencia">Aparência</a>
+      <a href="#inicio">Ao abrir</a>
+      <a href="#pesquisa">Pesquisa</a>
+      <a href="#privacidade">Privacidade</a>
+      <a href="#desempenho">Desempenho</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#paineis">Painéis laterais</a>
+      <a href="#extensoes">Extensões</a>
+      <a href="#sistema">Sistema</a>
+    </nav>
+
+    <main class="content">
+      <section id="aparencia">
+        <h2>Aparência</h2>
+        <div class="card">
+          <div class="label">Tema</div>
+          <div class="themes">
+            <button class="theme-card" data-theme-pick="tinta">
+              <span class="preview tinta"><b></b><i></i><u></u></span>
+              <strong>Tinta</strong><small>Escuro, preto de nanquim</small>
+            </button>
+            <button class="theme-card" data-theme-pick="papel">
+              <span class="preview papel"><b></b><i></i><u></u></span>
+              <strong>Papel</strong><small>Claro, cor de papel cru</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="card colors">
+          <div class="color-preview" aria-hidden="true">
+            <svg class="mini-enso" id="mini-enso"></svg>
+            <div class="mini-clock">10:29</div>
+            <svg class="mini-seal" viewBox="0 0 32 32"><rect x="1.5" y="1.5" width="29" height="29" rx="5" fill="var(--accent)"/><text x="16" y="23.6" text-anchor="middle" font-family="Mincho" font-weight="800" font-size="20" fill="var(--bg)">墨</text></svg>
+          </div>
+          <div class="color-side">
+            <div class="label">Cores</div>
+            <div class="presets" id="presets"></div>
+            <div class="pickers">
+              <label class="picker"><input type="color" id="pick-enso"><span><b>Círculo</b><small>O traço em volta do relógio</small></span></label>
+              <label class="picker"><input type="color" id="pick-accent"><span><b>Detalhes</b><small>Carimbo, abas e botões do topo</small></span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="opt"><div><b>Barra de favoritos</b><small>Ctrl+Shift+B mostra ou esconde</small></div><button class="switch" data-bool="bookmarksBar"></button></div>
+          <div class="opt"><div><b>Barra lateral</b><small>Painéis, atalhos e medidor de memória. Ctrl+Shift+S</small></div><button class="switch" data-bool="sidebar"></button></div>
+          <div class="opt"><div><b>Relógio na nova aba</b></div><button class="switch" data-bool="newtabClock"></button></div>
+          <div class="opt"><div><b>Textura de papel na nova aba</b></div><button class="switch" data-bool="newtabTexture"></button></div>
+        </div>
+      </section>
+
+      <section id="inicio">
+        <h2>Ao abrir</h2>
+        <div class="card">
+          <label class="radio"><input type="radio" name="startup" value="restore"><span><b>Continuar de onde parei</b><small>Reabre as abas da última vez. Elas só carregam quando você clica, para economizar memória.</small></span></label>
+          <label class="radio"><input type="radio" name="startup" value="newtab"><span><b>Abrir uma nova aba</b></span></label>
+          <div class="label">Página inicial (Alt+Home)</div>
+          <div class="inline">
+            <input class="field" id="homepage" spellcheck="false">
+            <button class="btn" id="home-newtab">Usar nova aba</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="pesquisa">
+        <h2>Pesquisa</h2>
+        <div class="card">
+          <div class="label">Buscador da barra de endereço</div>
+          <div class="engines" id="engines"></div>
+          <div class="opt"><div><b>Sugestões enquanto digita</b><small>Envia o que você digita para o buscador escolhido (Google ou DuckDuckGo)</small></div><button class="switch" data-bool="suggestions"></button></div>
+        </div>
+      </section>
+
+      <section id="privacidade">
+        <h2>Privacidade e bloqueio</h2>
+        <div class="card">
+          <div class="opt"><div><b>Bloquear anúncios e rastreadores</b><small id="ab-info">Carregando lista...</small></div><button class="switch" data-bool="adblock"></button></div>
+          <div class="label">Sites liberados (bloqueador desligado)</div>
+          <div id="allow-list" class="chips"></div>
+        </div>
+        <div class="card">
+          <div class="label">Limpar dados de navegação</div>
+          <div class="checks">
+            <label><input type="checkbox" id="c-history" checked> Histórico</label>
+            <label><input type="checkbox" id="c-cookies"> Cookies e dados de sites <small>(sai das contas)</small></label>
+            <label><input type="checkbox" id="c-cache" checked> Imagens e arquivos guardados</label>
+            <label><input type="checkbox" id="c-downloads"> Lista de downloads <small>(os arquivos continuam no computador)</small></label>
+          </div>
+          <div class="inline">
+            <select class="field" id="c-range">
+              <option value="3600000">Histórico da última hora</option>
+              <option value="86400000">Histórico das últimas 24 horas</option>
+              <option value="604800000">Histórico dos últimos 7 dias</option>
+              <option value="0" selected>Todo o período</option>
+            </select>
+            <button class="btn primary" id="c-go">Limpar agora</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="label">Permissões que você já respondeu</div>
+          <div id="perms"></div>
+        </div>
+      </section>
+
+      <section id="desempenho">
+        <h2>Desempenho</h2>
+        <div class="card">
+          <div class="opt"><div><b>Abas paradas dormem</b><small>Abas que você não abre há um tempo liberam memória. Acordam ao clicar.</small></div>
+            <select class="field small" data-num="sleepMinutes">
+              <option value="0">Nunca</option><option value="5">5 min</option><option value="15">15 min</option>
+              <option value="30">30 min</option><option value="60">1 hora</option><option value="180">3 horas</option>
+            </select>
+          </div>
+          <div class="opt"><div><b>Limite de memória</b><small>Passou do limite, o Nanquim faz dormir as abas mais antigas, uma por vez.</small></div>
+            <select class="field small" data-num="ramLimitMB">
+              <option value="0">Sem limite</option><option value="1024">1 GB</option><option value="2048">2 GB</option>
+              <option value="3072">3 GB</option><option value="4096">4 GB</option><option value="6144">6 GB</option><option value="8192">8 GB</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section id="downloads">
+        <h2>Downloads</h2>
+        <div class="card">
+          <div class="opt"><div><b>Pasta</b><small id="dl-dir"></small></div><button class="btn" id="dl-change">Alterar</button></div>
+          <div class="opt"><div><b>Perguntar onde salvar cada arquivo</b></div><button class="switch" data-bool="askDownload"></button></div>
+        </div>
+      </section>
+
+      <section id="paineis">
+        <h2>Painéis laterais</h2>
+        <div class="card">
+          <p class="note">Sites que abrem por cima da página, sem dividir a tela. O login fica salvo e eles continuam rodando por trás. Clique com o botão direito no ícone para recarregar, abrir em uma aba ou fechar e liberar memória.</p>
+          <div class="opt"><div><b>Largura do painel</b><small>Ou arraste a borda direita do painel. Dois cliques na borda voltam ao padrão.</small></div>
+            <select class="field small" data-num="panelWidth">
+              <option value="360">Estreito</option><option value="420">Médio</option><option value="520">Largo</option><option value="640">Bem largo</option>
+            </select>
+          </div>
+          <div class="opt"><div><b>Manter aberto ao clicar na página</b><small>Desligado, o painel fecha sozinho quando você clica fora dele.</small></div><button class="switch" data-bool="panelPinned"></button></div>
+          <div class="label">Painéis</div>
+          <div id="panels"></div>
+          <div class="label">Adicionar painel</div>
+          <form class="inline" id="panel-form">
+            <input class="field" id="p-name" placeholder="Nome (ex.: Gmail)" required>
+            <input class="field" id="p-url" placeholder="Endereço" required>
+            <button class="btn primary" type="submit">Adicionar</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="extensoes">
+        <h2>Extensões <span class="tag">em teste</span></h2>
+        <div class="card">
+          <p class="note">O Nanquim aceita extensões do Chrome descompactadas (uma pasta com <code>manifest.json</code>). As que só mexem na página costumam funcionar. As que dependem de muitos recursos do Chrome podem não funcionar.</p>
+          <div id="exts"></div>
+          <button class="btn" id="ext-add">Carregar pasta de extensão</button>
+        </div>
+      </section>
+
+      <section id="sistema">
+        <h2>Sistema</h2>
+        <div class="card">
+          <div class="opt"><div><b>Atualizações</b><small id="upd-info">O Nanquim se atualiza sozinho.</small></div><button class="btn" id="upd-btn">Procurar agora</button></div>
+          <div class="opt"><div><b>Navegador padrão</b><small id="default-info"></small></div><button class="btn" id="set-default">Definir como padrão</button></div>
+          <div class="opt"><div><b>Pasta de dados</b><small id="data-dir"></small></div><button class="btn" id="open-data">Abrir</button></div>
+          <div class="opt"><div><b>Restaurar configurações</b><small>Volta tudo ao padrão. Não apaga favoritos nem histórico.</small></div><button class="btn danger" id="reset">Restaurar</button></div>
+        </div>
+        <div class="card">
+          <div class="label">Atalhos de teclado</div>
+          <div class="keys">
+            <span>Nova aba</span><kbd>Ctrl T</kbd><span>Fechar aba</span><kbd>Ctrl W</kbd>
+            <span>Reabrir aba fechada</span><kbd>Ctrl ⇧ T</kbd><span>Próxima aba</span><kbd>Ctrl Tab</kbd>
+            <span>Ir para a aba 1 a 8</span><kbd>Ctrl 1..8</kbd><span>Última aba</span><kbd>Ctrl 9</kbd>
+            <span>Barra de endereço</span><kbd>Ctrl L</kbd><span>Procurar na página</span><kbd>Ctrl F</kbd>
+            <span>Favoritar</span><kbd>Ctrl D</kbd><span>Histórico</span><kbd>Ctrl H</kbd>
+            <span>Downloads</span><kbd>Ctrl J</kbd><span>Janela anônima</span><kbd>Ctrl ⇧ N</kbd>
+            <span>Zoom</span><kbd>Ctrl + − 0</kbd><span>Tela cheia</span><kbd>F11</kbd>
+            <span>Recarregar sem cache</span><kbd>Ctrl ⇧ R</kbd><span>Ferramentas do desenvolvedor</span><kbd>F12</kbd>
+          </div>
+        </div>
+        <p class="about" id="about"></p>
+      </section>
+    </main>
+  </div>
+  <script src="common.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

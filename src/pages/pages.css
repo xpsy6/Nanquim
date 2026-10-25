@@ -1,0 +1,115 @@
+/* Paginas internas do Nanquim: mesma tinta, mesmo papel. */
+@font-face { font-family: 'Mincho'; src: url('/fonts/mincho-500.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Mincho'; src: url('/fonts/mincho-800.woff2') format('woff2'); font-weight: 800; }
+@font-face { font-family: 'Mincho'; src: url('/fonts/mincho-jp-800.woff2') format('woff2'); font-weight: 800; unicode-range: U+58A8; }
+@font-face { font-family: 'Gothic'; src: url('/fonts/gothic-400.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Gothic'; src: url('/fonts/gothic-500.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Gothic'; src: url('/fonts/gothic-700.woff2') format('woff2'); font-weight: 700; }
+@font-face { font-family: 'Plex Mono'; src: url('/fonts/plexmono-400.woff2') format('woff2'); font-weight: 400; }
+
+:root {
+  --accent-pick: #e0452b; --enso-pick: #e0452b;
+  --accent: var(--accent-pick); --enso: var(--enso-pick); --accent-ink: #fff;
+  --f-display: 'Mincho', 'Yu Mincho', Georgia, serif;
+  --f-ui: 'Gothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --f-mono: 'Plex Mono', Consolas, monospace;
+  --ease: cubic-bezier(.45, 0, .2, 1);
+  --spring: cubic-bezier(.22, .9, .28, 1.08);
+  --out: cubic-bezier(.2, .7, .25, 1);
+  --bg: #191714; --well: #0f0e0c; --s1: #221f1b; --s2: #2b2722;
+  --line: #2b2722; --line2: #3a352e; --text: #ebe3d3; --muted: #8e8679; --faint: #5b544b;
+  --danger: #ff6a55; --ok: #7fbf7a; --shadow: 0 18px 44px rgba(0, 0, 0, .45);
+  color-scheme: dark;
+}
+:root[data-theme="papel"] {
+  --bg: #f3ede1; --well: #ebe4d6; --s1: #e6dfcf; --s2: #ddd5c3;
+  --line: #d5cbb7; --line2: #c4b9a3; --text: #1d1a16; --muted: #776e61; --faint: #a59b8a;
+  --danger: #c8371f; --ok: #3d7a38; --shadow: 0 18px 40px rgba(60, 45, 25, .16);
+  --accent: color-mix(in oklab, var(--accent-pick) 82%, black);
+  --enso: color-mix(in oklab, var(--enso-pick) 85%, black);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; min-height: 100vh; font: 400 14px/1.5 var(--f-ui); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, input, select { font: inherit; color: inherit; }
+svg { display: block; }
+[hidden] { display: none !important; }
+::selection { background: color-mix(in oklab, var(--accent) 40%, transparent); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 5px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- moldura das paginas de gestao ---------- */
+.page { max-width: 940px; margin: 0 auto; padding: 48px 32px 80px; animation: rise .45s var(--out); }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+.page-head { display: flex; align-items: flex-end; gap: 18px; padding-bottom: 20px; margin-bottom: 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.page-title { margin: 0; font: 800 48px/1 var(--f-display); position: relative; padding-bottom: 12px; }
+.page-title::after {
+  content: ''; position: absolute; left: 2px; bottom: 0; width: 72px; height: 7px;
+  background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 7' preserveAspectRatio='none'%3E%3Cpath d='M1 4 C 20 1.5, 60 1.2, 99 3 L 97 5.5 C 60 4.4, 25 6.4, 2 6.6 Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  animation: brush .6s var(--ease) .15s both;
+  transform-origin: left;
+}
+@keyframes brush { from { transform: scaleX(0); } }
+.page-sub { color: var(--muted); padding-bottom: 6px; }
+.head-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.btn { height: 36px; padding: 0 16px; border-radius: 9px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line2); background: transparent; font-weight: 500; font-size: 13.5px; transition: background .15s, transform .15s; }
+.btn svg { width: 15px; height: 15px; }
+.btn:hover { background: var(--s1); }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { background: color-mix(in oklab, var(--accent) 88%, white); }
+.btn.danger { color: var(--danger); }
+.btn.ghost { border-color: transparent; }
+
+.field { height: 40px; width: 100%; border-radius: 10px; border: 1px solid var(--line2); background: var(--well); padding: 0 14px; outline: 0; font-size: 14px; transition: border-color .15s, box-shadow .15s; }
+.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent); }
+.searchbar { position: relative; margin-bottom: 20px; }
+.searchbar svg { position: absolute; left: 14px; top: 13px; width: 16px; height: 16px; color: var(--muted); }
+.searchbar .field { padding-left: 40px; height: 44px; }
+
+.icon-btn { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: none; border: 0; color: var(--muted); }
+.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn:hover { background: var(--s1); color: var(--text); }
+.icon-btn.danger:hover { color: var(--danger); }
+.icon-btn:disabled { opacity: .35; }
+
+.fav { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line2); overflow: hidden; }
+.fav img { width: 16px; height: 16px; border-radius: 3px; }
+.fav:has(img) { border: 0; border-radius: 0; }
+.fav b { font: 800 10px/1 var(--f-display); }
+
+.group-label { margin: 28px 0 8px; font: 800 20px/1 var(--f-display); display: flex; align-items: baseline; gap: 10px; }
+.group-label small { font: 400 12.5px/1 var(--f-ui); color: var(--muted); }
+
+.row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 10px; border-radius: 10px; }
+.row:hover { background: var(--s1); }
+.row .time { font: 400 12px/1 var(--f-mono); color: var(--muted); width: 44px; flex: none; }
+.row .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 500; }
+.row .title:hover { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.row .url { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--muted); }
+.row .actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.row:hover .actions, .row:focus-within .actions { opacity: 1; }
+
+.empty { padding: 64px 20px; text-align: center; color: var(--muted); }
+.empty b { display: block; font: 800 30px/1.1 var(--f-display); color: var(--text); margin-bottom: 8px; }
+.more { display: block; margin: 22px auto 0; }
+
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: var(--text); color: var(--bg); padding: 11px 18px; border-radius: 10px; font-weight: 500; box-shadow: var(--shadow); opacity: 0; pointer-events: none; }
+.toast.show { animation: toast 2.6s var(--ease); }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 16px); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
+
+.switch { width: 40px; height: 23px; flex: none; border-radius: 12px; border: 0; background: var(--line2); position: relative; padding: 0; transition: background .2s; }
+.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: var(--bg); transition: left .25s var(--spring); }
+.switch.on { background: var(--accent); }
+.switch.on::after { left: 20px; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* logos pretos (GitHub, X, Notion...) ficam claros no tema escuro */
+:root:not([data-theme="papel"]) img.mono { filter: invert(1) brightness(.92); }

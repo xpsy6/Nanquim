@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+  <title>Nanquim</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="snap.css">
+</head>
+<body data-theme="tinta">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="rough" x="-10%" y="-30%" width="120%" height="160%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+      <filter id="stamp" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="2" seed="11" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="0.8" result="d"/>
+        <feTurbulence type="fractalNoise" baseFrequency="1.1" seed="4" result="g"/>
+        <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -8 5.8" result="h"/>
+        <feComposite in="d" in2="h" operator="in"/>
+      </filter>
+      <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+    </defs>
+  </svg>
+  <svg class="grain" aria-hidden="true"><rect width="100%" height="100%" filter="url(#noise)"/></svg>
+
+  <div id="app">
+    <header id="top" class="drag">
+      <svg id="seal" viewBox="0 0 32 32" aria-label="Nanquim"><g filter="url(#stamp)"><rect x="1.5" y="1.5" width="29" height="29" rx="5" fill="var(--accent)"/><text x="16" y="23.6" text-anchor="middle" font-family="Mincho" font-weight="800" font-size="20" fill="var(--frame)">墨</text></g></svg>
+      <div class="nav">
+        <button id="btn-back" class="icon-btn" title="Voltar (Alt+Esquerda)" data-icon="back"></button>
+        <button id="btn-fwd" class="icon-btn" title="Avançar (Alt+Direita)" data-icon="fwd"></button>
+        <button id="btn-reload" class="icon-btn" title="Recarregar (F5)" data-icon="reload"></button>
+      </div>
+      <div id="private-badge" hidden><span data-icon="mask"></span>anônima</div>
+      <div id="tabs" role="tablist">
+        <button id="btn-newtab" class="icon-btn" title="Nova aba (Ctrl+T)" data-icon="plus"></button>
+        <svg id="uline" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true"><path d="M1 3 C 20 1.6, 60 1.4, 99 2.6 L 98 3.8 C 60 3.2, 25 4, 2 4.2 Z" fill="var(--accent)" filter="url(#rough)"/></svg>
+      </div>
+    </header>
+
+    <nav id="rail">
+      <div id="rail-panels"></div>
+      <button class="rail-btn" id="rail-add" title="Adicionar ou tirar painéis" data-icon="plus"></button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn" data-open="bookmarks" title="Favoritos (Ctrl+Shift+O)" data-icon="bookmark"></button>
+      <button class="rail-btn" data-open="history" title="Histórico (Ctrl+H)" data-icon="clock"></button>
+      <button class="rail-btn" data-open="downloads" title="Downloads (Ctrl+J)" data-icon="download"></button>
+      <button class="rail-btn" data-open="settings" title="Configurações (Ctrl+,)" data-icon="sliders"></button>
+      <div class="rail-fill"></div>
+      <div id="meter" title="Memória usada pelo navegador">
+        <div class="mbar"><i></i></div>
+        <b id="meter-ram">0</b>
+      </div>
+    </nav>
+
+    <main id="main" class="card">
+      <div id="toolbar">
+        <div id="omni">
+          <span id="omni-badge" class="omni-badge"></span>
+          <div class="omni-field">
+            <input id="address" spellcheck="false" autocomplete="off" placeholder="Pesquisar ou digitar endereço">
+            <div id="address-view" aria-hidden="true"></div>
+          </div>
+          <button id="zoom-chip" class="chip" hidden title="Voltar ao zoom normal (Ctrl+0)"></button>
+          <button id="btn-shield" class="shield" title="Bloqueador de anúncios"><span data-icon="shield"></span><b id="shield-count"></b></button>
+        </div>
+        <button id="btn-snap" class="icon-btn" title="Tirar print (Ctrl+Shift+5)" data-icon="camera"></button>
+        <button id="btn-star" class="icon-btn" title="Favoritar (Ctrl+D)" data-icon="star"></button>
+        <button id="btn-downloads" class="icon-btn" title="Downloads">
+          <span data-icon="download"></span>
+          <svg class="ring" viewBox="0 0 36 36" hidden><circle cx="18" cy="18" r="15" pathLength="100"></circle></svg>
+        </button>
+        <button id="btn-update" class="update-pill" hidden title="Instala a versão nova e abre o Nanquim de novo"><span data-icon="refresh"></span>Atualizar</button>
+        <button id="btn-menu" class="icon-btn" title="Menu" data-icon="menu"></button>
+      </div>
+      <div id="bookmarks"></div>
+      <div id="findbar" hidden>
+        <span data-icon="search" class="find-ic"></span>
+        <input id="find-input" spellcheck="false" placeholder="Procurar na página">
+        <span id="find-count">0/0</span>
+        <button id="find-prev" class="icon-btn small" title="Anterior (Shift+Enter)" data-icon="up"></button>
+        <button id="find-next" class="icon-btn small" title="Próximo (Enter)" data-icon="down"></button>
+        <button id="find-close" class="icon-btn small" title="Fechar (Esc)" data-icon="close"></button>
+      </div>
+      <div id="loadline"><i></i></div>
+      <div id="viewport"><img id="frozen" alt="" hidden></div>
+    </main>
+  </div>
+
+  <div id="layer"><img id="frozen-panel" alt="" hidden><div id="backdrop"></div></div>
+  <script src="ui.js"></script>
+  <script src="snap.js"></script>
+</body>
+</html>

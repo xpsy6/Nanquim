@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>Histórico</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <h1 class="page-title">Histórico</h1>
+      <span class="page-sub" id="sub">Tudo que você abriu fora da janela anônima.</span>
+      <div class="head-actions">
+        <button class="btn" id="clear">Limpar dados de navegação</button>
+      </div>
+    </header>
+    <div class="searchbar">
+      <span data-i="search"></span>
+      <input class="field" id="q" placeholder="Pesquisar no histórico" spellcheck="false" autofocus>
+    </div>
+    <div id="list"></div>
+    <button class="btn more" id="more" hidden>Carregar mais</button>
+  </div>
+  <script src="common.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

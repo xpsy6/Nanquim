@@ -1,0 +1,75 @@
+/* Print: escolher area e editar a imagem antes de copiar ou salvar */
+#snap { position: fixed; inset: 0; z-index: 80; animation: snap-in .18s var(--out); }
+@keyframes snap-in { from { opacity: 0; } }
+#snap.closing { animation: snap-out .16s var(--ease) forwards; }
+@keyframes snap-out { to { opacity: 0; } }
+.snap-scrim { position: absolute; inset: 0; background: rgba(8, 7, 6, .45); }
+body[data-theme="papel"] .snap-scrim { background: rgba(40, 30, 20, .35); }
+
+/* etapa 1: escolher a area */
+.snap-stage { position: absolute; overflow: hidden; border-radius: var(--r-page); cursor: crosshair; }
+.snap-stage img { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.snap-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .32); transition: opacity .15s; }
+.snap-sel { position: absolute; border: 2px solid var(--accent); border-radius: 3px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5); }
+.snap-sel::before, .snap-sel::after { content: ''; position: absolute; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; }
+.snap-sel::before { left: -6px; top: -6px; }
+.snap-sel::after { right: -6px; bottom: -6px; }
+.snap-size { position: absolute; left: 0; top: -30px; padding: 4px 8px; border-radius: 6px; background: var(--card); color: var(--text); font: 400 11px/1 var(--f-mono); white-space: nowrap; }
+.snap-sel.low .snap-size { top: auto; bottom: -30px; }
+
+.snap-bar {
+  position: absolute; left: 50%; top: 58px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 16px;
+  border-radius: 14px; background: var(--card); border: 1px solid var(--line2); box-shadow: var(--shadow);
+  white-space: nowrap; animation: bar-in .3s var(--spring);
+}
+@keyframes bar-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+.snap-bar .hint { color: var(--muted); margin-right: 8px; }
+.snap-bar .hint b { color: var(--text); font-weight: 500; }
+.sbtn { height: 34px; padding: 0 12px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px; font-weight: 500; color: var(--text); transition: background .15s, transform .15s; }
+.sbtn svg { width: 16px; height: 16px; }
+.sbtn:hover { background: var(--s1); }
+.sbtn:active { transform: scale(.96); }
+.sbtn.primary { background: var(--accent); color: var(--accent-ink); }
+.sbtn.primary:hover { background: color-mix(in oklab, var(--accent) 88%, white); }
+.sbtn.icon { width: 34px; padding: 0; justify-content: center; }
+.sbtn.on { background: var(--s2); color: var(--accent); }
+.sbtn:disabled { opacity: .35; }
+.ssep { width: 1px; height: 22px; background: var(--line2); margin: 0 4px; }
+
+/* etapa 2: editor */
+.snap-editor {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(1240px, calc(100vw - 60px)); height: calc(100vh - 70px);
+  display: flex; flex-direction: column;
+  border-radius: 16px; background: var(--card); border: 1px solid var(--line2); box-shadow: var(--shadow);
+  overflow: hidden; animation: ed-in .32s var(--spring);
+}
+@keyframes ed-in { from { opacity: 0; transform: translate(-50%, -48%) scale(.97); } }
+.snap-tools { flex: none; display: flex; align-items: center; gap: 2px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.snap-tools .title { font: 800 17px/1 var(--f-display); margin: 0 14px 0 6px; }
+.snap-tools .grow { flex: 1; }
+.swatch { width: 24px; height: 24px; border-radius: 50%; margin: 0 2px; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); transition: transform .2s var(--spring); }
+.swatch:hover { transform: scale(1.12); }
+.swatch.on { border-color: var(--text); }
+.snap-canvas-wrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: var(--well); display: grid; place-items: start center; padding: 24px; }
+.snap-canvas-wrap canvas { display: block; border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); background: #fff; touch-action: none; }
+.snap-canvas-wrap.t-pen canvas, .snap-canvas-wrap.t-marker canvas, .snap-canvas-wrap.t-arrow canvas,
+.snap-canvas-wrap.t-rect canvas, .snap-canvas-wrap.t-blur canvas { cursor: crosshair; }
+.snap-canvas-wrap.t-text canvas { cursor: text; }
+.snap-text { position: absolute; min-width: 40px; border: 1.5px dashed var(--accent); border-radius: 4px; background: rgba(0, 0, 0, .15); outline: 0; padding: 0 4px; font-family: var(--f-ui); font-weight: 700; }
+.snap-foot { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.snap-foot .kbd { font: 400 11px/1 var(--f-mono); color: var(--faint); }
+.snap-foot .grow { flex: 1; }
+
+.snap-toast {
+  position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px;
+  border-radius: 12px; background: var(--text); color: var(--frame); font-weight: 500; box-shadow: var(--shadow);
+  animation: toast-in .3s var(--spring);
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+.snap-toast button { height: 28px; padding: 0 10px; border-radius: 8px; background: rgba(127, 127, 127, .2); font-weight: 500; color: inherit; }
+.snap-busy { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 14px 18px; border-radius: 12px; background: var(--card); border: 1px solid var(--line2); color: var(--muted); display: flex; gap: 12px; align-items: center; }
+.snap-busy .spinner { width: 16px; height: 16px; }
+.snap-foot .copied { color: var(--accent); font-weight: 500; animation: toast-in .3s var(--spring); }

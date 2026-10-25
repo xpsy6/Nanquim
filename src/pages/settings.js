@@ -1,0 +1,242 @@
+'use strict';
+
+// combinacoes prontas: [cor do circulo, cor dos detalhes]
+const PRESETS = [
+  { name: 'Vermelho', enso: '#e0452b', accent: '#e0452b' },
+  { name: 'Roxo', enso: '#a768c4', accent: '#a768c4' },
+  { name: 'Roxo e vermelho', enso: '#a768c4', accent: '#e0452b' },
+  { name: 'Azul', enso: '#5b8bd6', accent: '#5b8bd6' },
+  { name: 'Verde', enso: '#7fa35b', accent: '#7fa35b' },
+  { name: 'Dourado', enso: '#c9a24a', accent: '#c9a24a' },
+  { name: 'Tinta', enso: '#ebe3d3', accent: '#e0452b' }
+];
+const PERM_NAMES = { media: 'Câmera e microfone', geolocation: 'Localização', notifications: 'Notificações', midiSysex: 'MIDI', 'idle-detection': 'Detecção de inatividade' };
+
+let S = null;
+const set = (key, value) => NQ.api('setSetting', { key, value });
+
+// ---------- navegacao lateral ----------
+const links = $$('.side a');
+function markNav() {
+  let current = 'aparencia';
+  for (const sec of $$('section')) if (sec.getBoundingClientRect().top < 140) current = sec.id;
+  links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + current));
+}
+addEventListener('scroll', markNav, { passive: true });
+function goHash() {
+  const id = location.hash.slice(1);
+  const el = id && document.getElementById(id);
+  if (el) el.scrollIntoView();
+  markNav();
+}
+addEventListener('hashchange', goHash);
+
+// ---------- controles simples ----------
+$$('[data-bool]').forEach(b => b.addEventListener('click', () => set(b.dataset.bool, !S[b.dataset.bool])));
+$$('[data-num]').forEach(sel => sel.addEventListener('change', () => set(sel.dataset.num, Number(sel.value))));
+$$('[data-theme-pick]').forEach(b => b.addEventListener('click', () => set('theme', b.dataset.themePick)));
+$$('input[name="startup"]').forEach(r => r.addEventListener('change', () => set('startup', r.value)));
+$('#homepage').addEventListener('change', (e) => {
+  let v = e.target.value.trim() || 'nanquim://newtab';
+  if (!/^[a-z]+:\/\//i.test(v)) v = 'https://' + v;
+  set('homepage', v);
+  toast('Página inicial salva');
+});
+$('#home-newtab').addEventListener('click', () => set('homepage', 'nanquim://newtab'));
+// seletores de cor: mostram a cor na hora e salvam quando voce solta
+for (const [id, key, cssVar] of [['#pick-enso', 'enso', '--enso-pick'], ['#pick-accent', 'accent', '--accent-pick']]) {
+  const inp = $(id);
+  // aplica no navegador inteiro enquanto voce escolhe, sem esperar fechar a janelinha de cor
+  let timer = null;
+  inp.addEventListener('input', () => {
+    document.documentElement.style.setProperty(cssVar, inp.value);
+    clearTimeout(timer);
+    timer = setTimeout(() => set(key, inp.value), 120);
+  });
+  inp.addEventListener('change', () => { clearTimeout(timer); set(key, inp.value); });
+}
+drawEnso($('#mini-enso'), { paint: true, seed: 3 });
+
+function renderAll(s) {
+  S = s;
+  $$('[data-bool]').forEach(b => b.classList.toggle('on', !!s[b.dataset.bool]));
+  $$('[data-num]').forEach(sel => {
+    const v = String(s[sel.dataset.num]);
+    // largura escolhida arrastando a borda do painel aparece como "Personalizada"
+    let custom = sel.querySelector('option[data-custom]');
+    if (![...sel.options].some(o => o.value === v && !o.dataset.custom)) {
+      if (!custom) { custom = document.createElement('option'); custom.dataset.custom = '1'; sel.appendChild(custom); }
+      custom.value = v;
+      custom.textContent = `Personalizada (${v} px)`;
+    } else if (custom) custom.remove();
+    sel.value = v;
+  });
+  $$('[data-theme-pick]').forEach(b => b.classList.toggle('on', b.dataset.themePick === s.theme));
+  $$('input[name="startup"]').forEach(r => { r.checked = r.value === s.startup; });
+  if (document.activeElement !== $('#homepage')) $('#homepage').value = s.homepage;
+
+  // cores
+  const pr = $('#presets');
+  const same = (x, y) => (x || '').toLowerCase() === (y || '').toLowerCase();
+  pr.innerHTML = PRESETS.map((p, i) => `<button class="preset${same(p.enso, s.enso) && same(p.accent, s.accent) ? ' on' : ''}" data-p="${i}"><span class="dots"><i style="background:${p.enso}"></i><i style="background:${p.accent}"></i></span>${esc(p.name)}</button>`).join('');
+  $$('.preset', pr).forEach(b => b.addEventListener('click', async () => {
+    const p = PRESETS[Number(b.dataset.p)];
+    await set('enso', p.enso);
+    await set('accent', p.accent);
+    drawEnso($('#mini-enso'), { paint: true, seed: 3 });
+  }));
+  if (document.activeElement !== $('#pick-enso')) $('#pick-enso').value = s.enso || s.accent;
+  if (document.activeElement !== $('#pick-accent')) $('#pick-accent').value = s.accent;
+  $$('[data-theme-pick] .preview u').forEach(u => { u.style.borderColor = 'var(--enso)'; });
+
+  // buscadores
+  const eng = $('#engines');
+  eng.innerHTML = Object.entries(s.searchEngines).map(([id, e]) => `<button class="engine${id === s.searchEngine ? ' on' : ''}" data-e="${id}">${esc(e.name)}</button>`).join('');
+  $$('.engine', eng).forEach(b => b.addEventListener('click', () => set('searchEngine', b.dataset.e)));
+
+  // sites liberados
+  const al = $('#allow-list');
+  al.innerHTML = s.adblockAllow.length
+    ? s.adblockAllow.map(site => `<span class="chip">${esc(site)}<button class="icon-btn" data-site="${esc(site)}" title="Voltar a bloquear">${icon('close')}</button></span>`).join('')
+    : '<span class="none">Nenhum. Use o escudo na barra de endereço para liberar um site.</span>';
+  $$('[data-site]', al).forEach(b => b.addEventListener('click', () => set('adblockAllow', S.adblockAllow.filter(x => x !== b.dataset.site))));
+
+  // paineis
+  const pn = $('#panels');
+  const defaults = ['whatsapp', 'instagram', 'discord', 'spotify', 'telegram', 'ytmusic'];
+  pn.innerHTML = s.panels.map((p, i) => `<div class="panel-row">
+      <span class="st">${p.icon ? `<img src="${esc(p.icon)}" alt="">` : esc(p.name[0])}</span>
+      <span class="n"><b>${esc(p.name)}</b><small>${esc(p.url)}</small></span>
+      ${defaults.includes(p.id) ? '' : `<button class="icon-btn danger" data-rm="${i}" title="Remover">${icon('trash')}</button>`}
+      <button class="switch${p.enabled ? ' on' : ''}" data-pi="${i}"></button>
+    </div>`).join('');
+  $$('[data-pi]', pn).forEach(b => b.addEventListener('click', () => {
+    const panels = S.panels.map(x => ({ ...x }));
+    panels[Number(b.dataset.pi)].enabled = !panels[Number(b.dataset.pi)].enabled;
+    set('panels', panels);
+  }));
+  $$('[data-rm]', pn).forEach(b => b.addEventListener('click', () => set('panels', S.panels.filter((_, i) => i !== Number(b.dataset.rm)))));
+
+  $('#dl-dir').textContent = s.downloadDir || '(pasta Downloads do sistema)';
+  refreshInfo();
+}
+onSettings(renderAll);
+
+$('#panel-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#p-name').value.trim();
+  let url = $('#p-url').value.trim();
+  if (!name || !url) return;
+  if (!/^[a-z]+:\/\//i.test(url)) url = 'https://' + url;
+  const id = 'custom-' + Date.now();
+  set('panels', [...S.panels, { id, name, short: name.slice(0, 2).toUpperCase(), url, enabled: true }]);
+  e.target.reset();
+  toast('Painel adicionado na barra lateral');
+});
+
+// ---------- limpar dados ----------
+$('#c-go').addEventListener('click', async () => {
+  const range = Number($('#c-range').value);
+  const opts = {
+    history: $('#c-history').checked,
+    cookies: $('#c-cookies').checked,
+    cache: $('#c-cache').checked,
+    downloads: $('#c-downloads').checked,
+    since: range ? Date.now() - range : 0
+  };
+  if (!opts.history && !opts.cookies && !opts.cache && !opts.downloads) return toast('Marque pelo menos uma opção');
+  $('#c-go').disabled = true;
+  await NQ.api('clearData', opts);
+  $('#c-go').disabled = false;
+  toast('Dados apagados');
+});
+
+// ---------- permissoes ----------
+async function renderPerms() {
+  const p = await NQ.api('permissions');
+  const rows = [];
+  for (const [origin, perms] of Object.entries(p)) for (const [perm, val] of Object.entries(perms)) rows.push({ origin, perm, val });
+  const box = $('#perms');
+  box.innerHTML = rows.length ? rows.map((r, i) => `<div class="prow">
+      <span class="o">${esc(r.origin.replace(/^https?:\/\//, ''))}</span>
+      <span class="p">${esc(PERM_NAMES[r.perm] || r.perm)}</span>
+      <span class="v ${r.val ? 'yes' : 'no'}">${r.val ? 'PERMITIDO' : 'BLOQUEADO'}</span>
+      <button class="icon-btn" data-i="${i}" title="Esquecer (o site vai perguntar de novo)">${icon('close')}</button>
+    </div>`).join('') : '<span class="none">Nenhum site pediu permissão ainda.</span>';
+  $$('[data-i]', box).forEach(b => b.addEventListener('click', async () => {
+    const r = rows[Number(b.dataset.i)];
+    await NQ.api('removePermission', { origin: r.origin, perm: r.perm });
+    renderPerms();
+  }));
+}
+
+// ---------- extensoes ----------
+async function renderExts() {
+  const list = await NQ.api('extensions');
+  const box = $('#exts');
+  box.innerHTML = list.length ? list.map((x, i) => `<div class="panel-row">
+      <span class="st">${esc((x.name || '?').slice(0, 2).toUpperCase())}</span>
+      <span class="n"><b>${esc(x.name)} <small style="display:inline">${esc(x.version)}</small></b><small>${esc(x.path)}</small></span>
+      <button class="icon-btn danger" data-x="${i}" title="Remover">${icon('trash')}</button>
+    </div>`).join('') : '<p class="none" style="margin:0 0 12px">Nenhuma extensão carregada.</p>';
+  $$('[data-x]', box).forEach(b => b.addEventListener('click', async () => {
+    const x = list[Number(b.dataset.x)];
+    await NQ.api('removeExtension', { id: x.id, path: x.path });
+    renderExts();
+  }));
+}
+$('#ext-add').addEventListener('click', async () => {
+  const r = await NQ.api('addExtension');
+  if (r.ok) toast('Extensão carregada');
+  else if (r.error) toast('Não carregou: ' + r.error.slice(0, 80));
+  renderExts();
+});
+
+// ---------- sistema ----------
+async function refreshInfo() {
+  const i = await NQ.api('info');
+  $('#ab-info').textContent = `${i.blocklist.toLocaleString('pt-BR')} domínios na lista · ${i.blockedTotal.toLocaleString('pt-BR')} bloqueados desde que você abriu`;
+  $('#data-dir').textContent = i.userData;
+  $('#default-info').textContent = i.isDefault ? 'O Nanquim já é o navegador padrão.' : 'Abre os links de outros programas no Nanquim.';
+  $('#about').textContent = `Nanquim ${i.version} · motor Chromium ${i.chrome}`;
+  if (!S || !S.downloadDir) $('#dl-dir').textContent = i.downloads;
+}
+$('#dl-change').addEventListener('click', async () => { const d = await NQ.api('chooseDownloadDir'); if (d) { $('#dl-dir').textContent = d; toast('Pasta alterada'); } });
+$('#set-default').addEventListener('click', async () => { await NQ.api('setDefaultBrowser'); toast('Escolha o Nanquim na tela de apps padrão do Windows'); refreshInfo(); });
+$('#open-data').addEventListener('click', () => NQ.api('openFolder', 'data'));
+$('#reset').addEventListener('click', async () => {
+  if (!confirm('Restaurar todas as configurações para o padrão?')) return;
+  await NQ.api('resetSettings');
+  toast('Configurações restauradas');
+});
+
+renderPerms();
+renderExts();
+setTimeout(goHash, 50);
+
+// ---------- atualizacoes ----------
+let INFO_VERSION = '';
+function renderUpdate(u) {
+  const info = $('#upd-info');
+  const btn = $('#upd-btn');
+  const v = INFO_VERSION ? `Versão ${INFO_VERSION}. ` : '';
+  btn.textContent = 'Procurar agora';
+  btn.disabled = false;
+  btn.onclick = () => NQ.api('checkUpdates').then(renderUpdate);
+  if (!u) return;
+  switch (u.status) {
+    case 'checking': info.textContent = v + 'Procurando versão nova...'; btn.disabled = true; break;
+    case 'downloading': info.textContent = v + `Baixando a versão ${u.version} (${u.progress}%). Pode continuar navegando.`; btn.disabled = true; break;
+    case 'ready':
+      info.textContent = v + `A versão ${u.version} está pronta. Ela entra quando você fechar o navegador, ou agora:`;
+      btn.textContent = 'Reiniciar e atualizar';
+      btn.onclick = () => NQ.api('installUpdate');
+      break;
+    case 'latest': info.textContent = v + 'Você está com a versão mais nova. O Nanquim procura sozinho ao abrir e a cada 2 horas.'; break;
+    case 'error': info.textContent = v + 'Não deu para procurar agora (sem internet ou servidor fora do ar). Ele tenta de novo sozinho.'; break;
+    case 'dev': info.textContent = v + 'Atualização automática desligada no modo de desenvolvimento.'; break;
+    default: info.textContent = v + 'O Nanquim procura versão nova sozinho ao abrir e a cada 2 horas.';
+  }
+}
+NQ.api('info').then(i => { INFO_VERSION = i.version; return NQ.api('update'); }).then(renderUpdate);
+NQ.on('update', renderUpdate);

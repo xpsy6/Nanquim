@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>Nova aba</title>
+  <link rel="stylesheet" href="pages.css">
+  <link rel="stylesheet" href="newtab.css">
+</head>
+<body>
+  <svg class="grain" aria-hidden="true"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#noise)"/></svg>
+
+  <main class="nt">
+    <div class="enso-wrap" id="enso-wrap">
+      <svg class="enso" id="enso"></svg>
+      <div class="clock" id="clock">
+        <div class="t"><span id="hh">00</span><i>:</i><span id="mm">00</span></div>
+        <div class="d" id="date"></div>
+      </div>
+    </div>
+
+    <form class="search" id="search">
+      <div class="row">
+        <span class="eng" id="eng">G</span>
+        <input id="q" autocomplete="off" spellcheck="false" placeholder="Pesquisar ou digitar endereço">
+      </div>
+      <svg class="line" viewBox="0 0 620 8" preserveAspectRatio="none" aria-hidden="true">
+        <defs><filter id="lr" x="-2%" y="-50%" width="104%" height="200%"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter></defs>
+        <path d="M2 4.2 C 150 3.2, 420 3.4, 618 4.0 L 617 5 C 420 4.6, 160 5.0, 3 5.2 Z" fill="var(--line2)"/>
+        <path id="ink" d="M2 3.6 C 150 2.4, 420 2.6, 618 3.4 L 617 5.6 C 420 5.2, 160 5.8, 3 5.8 Z" fill="var(--accent)" filter="url(#lr)"/>
+      </svg>
+    </form>
+
+    <section class="dial" id="dial"></section>
+  </main>
+
+  <div class="sig" aria-hidden="true"><b>墨</b>nanquim</div>
+
+  <script src="common.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>

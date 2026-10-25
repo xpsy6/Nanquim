@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>Downloads</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .dlrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 4px 14px; align-items: center; padding: 14px 12px; border-radius: 12px; }
+    .dlrow:hover { background: var(--s1); }
+    .ext { grid-row: span 3; width: 40px; height: 48px; border-radius: 8px; background: var(--s2); display: grid; place-items: end center; padding-bottom: 6px; font: 400 10px/1 var(--f-mono); text-transform: uppercase; color: var(--muted); }
+    .name { font-weight: 500; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .name.link { cursor: pointer; }
+    .name.link:hover { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+    .src { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .meta { font-size: 12.5px; }
+    .meta.bad { color: var(--danger); }
+    .meta.ok { color: var(--muted); }
+    .bar { height: 5px; border-radius: 3px; background: var(--s2); position: relative; overflow: hidden; margin: 3px 0; }
+    .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); transition: width .3s; }
+    .acts { grid-row: span 3; display: flex; gap: 6px; align-items: center; }
+    .acts .btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <h1 class="page-title">Downloads</h1>
+      <span class="page-sub" id="sub"></span>
+      <div class="head-actions">
+        <button class="btn" id="folder"><span data-i="folder"></span>Abrir pasta</button>
+        <button class="btn" id="clear">Limpar lista</button>
+      </div>
+    </header>
+    <div class="searchbar">
+      <span data-i="search"></span>
+      <input class="field" id="q" placeholder="Pesquisar downloads" spellcheck="false">
+    </div>
+    <div id="list"></div>
+  </div>
+  <script src="common.js"></script>
+  <script src="downloads.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+name: Publicar versão
+
+# Toda vez que o código muda, o GitHub monta o instalador num Windows e publica a versão
+# em Releases. O Nanquim instalado nos computadores encontra a versão nova e se atualiza sozinho.
+# Só publica se a versão do package.json ainda não existir em Releases.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar-versao
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Ver se a versão já foi publicada
+        id: v
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A versão $VERSION já está publicada, nada a fazer."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Instalar dependências
+        if: steps.v.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Montar o programa
+        if: steps.v.outputs.exists == 'false'
+        run: npx electron-builder --win --x64 --dir --publish never
+
+      - name: Preparar o NSIS
+        if: steps.v.outputs.exists == 'false'
+        shell: bash
+        run: |
+          if ! command -v makensis >/dev/null 2>&1 && [ ! -f "/c/Program Files (x86)/NSIS/makensis.exe" ]; then
+            choco install nsis -y --no-progress
+          fi
+          echo "C:\\Program Files (x86)\\NSIS" >> "$GITHUB_PATH"
+
+      - name: Montar o instalador
+        if: steps.v.outputs.exists == 'false'
+        shell: bash
+        working-directory: build
+        run: makensis -V2 -INPUTCHARSET UTF8 -DVERSION=${{ steps.v.outputs.version }} installer.nsi
+
+      - name: Gerar latest.yml
+        if: steps.v.outputs.exists == 'false'
+        run: node build/make-latest.js
+
+      - name: Publicar em Releases
+        if: steps.v.outputs.exists == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          NOTES="build/notas/$VERSION.md"
+          if [ ! -f "$NOTES" ]; then echo "Nanquim $VERSION" > notas.md; NOTES=notas.md; fi
+          gh release create "v$VERSION" "dist/Nanquim-Setup-$VERSION.exe" dist/latest.yml \
+            --repo "$GITHUB_REPOSITORY" --title "Nanquim $VERSION" --notes-file "$NOTES" --target "$GITHUB_SHA"
