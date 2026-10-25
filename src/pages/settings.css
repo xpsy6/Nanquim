@@ -115,3 +115,12 @@ select.field { appearance: none; background-image: linear-gradient(45deg, transp
   .pickers { grid-template-columns: 1fr; }
   .keys { grid-template-columns: 1fr auto; }
 }
+
+/* senha para abrir */
+.lock-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
+.lock-actions kbd { font: 400 11px/1 var(--f-mono); color: var(--faint); margin-left: 2px; }
+.lock-form { padding: 2px 0 12px; max-width: 420px; animation: rise .35s var(--out); }
+.lock-form .label:first-child { margin-top: 6px; }
+.lf-err { min-height: 18px; margin: 10px 0 0; color: var(--danger); font-size: 12.5px; }
+.lock-note { margin: 12px 0 0; font-size: 12.5px; }
+#lock-card .opt#lock-idle { border-top: 1px solid var(--line); }

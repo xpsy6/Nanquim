@@ -240,3 +240,68 @@ function renderUpdate(u) {
 }
 NQ.api('info').then(i => { INFO_VERSION = i.version; return NQ.api('update'); }).then(renderUpdate);
 NQ.on('update', renderUpdate);
+
+// ---------- senha para abrir ----------
+let LOCK_MODE = null; // 'create' | 'change' | 'remove'
+async function renderLock() {
+  const info = await NQ.api('lockInfo');
+  $('#lock-info').textContent = info.enabled
+    ? 'Ligada. O Nanquim pede a senha toda vez que abre.'
+    : 'Desligada. Quem abrir o Nanquim neste computador entra direto.';
+  $('#lock-create').hidden = info.enabled || LOCK_MODE !== null;
+  $('#lock-actions').hidden = !info.enabled || LOCK_MODE !== null;
+  $('#lock-idle').hidden = !info.enabled;
+}
+
+function openLockForm(mode) {
+  LOCK_MODE = mode;
+  const f = $('#lock-form');
+  f.reset();
+  $('#lf-err').textContent = '';
+  $('#lf-cur-box').hidden = mode === 'create';
+  $('#lf-new-box').hidden = mode === 'remove';
+  $('#lf-go').textContent = mode === 'remove' ? 'Tirar senha' : 'Salvar senha';
+  $('#lf-go').classList.toggle('primary', mode !== 'remove');
+  $('#lf-go').classList.toggle('danger', mode === 'remove');
+  f.hidden = false;
+  renderLock();
+  (mode === 'create' ? $('#lf-pw') : $('#lf-cur')).focus();
+}
+
+function closeLockForm() {
+  LOCK_MODE = null;
+  $('#lock-form').hidden = true;
+  $('#lock-form').reset();
+  renderLock();
+}
+
+$('#lock-create').addEventListener('click', () => openLockForm('create'));
+$('#lock-change').addEventListener('click', () => openLockForm('change'));
+$('#lock-off').addEventListener('click', () => openLockForm('remove'));
+$('#lf-cancel').addEventListener('click', closeLockForm);
+$('#lock-now').addEventListener('click', () => NQ.api('lockNow'));
+
+$('#lock-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = $('#lf-err');
+  err.textContent = '';
+  const current = $('#lf-cur').value;
+  if (LOCK_MODE === 'remove') {
+    const r = await NQ.api('lockRemove', { current });
+    if (!r.ok) { err.textContent = r.error; $('#lf-cur').select(); return; }
+    closeLockForm();
+    toast('Senha tirada. O Nanquim abre direto de novo.');
+    return;
+  }
+  const pw = $('#lf-pw').value;
+  const pw2 = $('#lf-pw2').value;
+  if (pw.length < 4) { err.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; $('#lf-pw').focus(); return; }
+  if (pw !== pw2) { err.textContent = 'As duas senhas não estão iguais.'; $('#lf-pw2').select(); return; }
+  const r = await NQ.api('lockSet', { current, password: pw, hint: $('#lf-hint').value });
+  if (!r.ok) { err.textContent = r.error; return; }
+  const was = LOCK_MODE;
+  closeLockForm();
+  toast(was === 'create' ? 'Senha criada. Da próxima vez que abrir, o Nanquim vai pedir.' : 'Senha trocada.');
+});
+
+renderLock();

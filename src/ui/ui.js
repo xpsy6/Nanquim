@@ -42,6 +42,7 @@ const ICONS = {
   exit: '<path d="M10 4H4v16h6M14 8l4 4-4 4M18 12H9"/>',
   retry: '<path d="M19.5 13A7.5 7.5 0 1 1 17.3 6.7"/><path d="M19.5 3.5v5h-5"/>',
   camera: '<path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>',
   refresh: '<path d="M4.5 11A7.5 7.5 0 0 1 18 7M19.5 13A7.5 7.5 0 0 1 6 17"/><path d="M18 3v4h-4M6 21v-4h4"/>'
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -681,6 +682,7 @@ function renderMenu(el) {
     ${item('devtools', 'code', 'Ferramentas do desenvolvedor', 'F12')}
     <div class="pop-sep"></div>
     ${item('settings', 'sliders', 'Configurações', 'Ctrl ,')}
+    ${state && state.lockOn ? item('lock', 'lock', 'Bloquear agora', 'Ctrl ⇧ L') : ''}
     ${item('quit', 'exit', 'Sair', '')}
     <div class="pop-sep"></div>
     <div class="mfoot"><span>${metrics.ram} MB · ${metrics.cpu}% cpu</span><b>${metrics.blocked || 0} bloqueados</b></div>`;

@@ -69,6 +69,7 @@ const DEFAULT_SETTINGS = {
   sidebar: true,
   sleepMinutes: 30,
   ramLimitMB: 0,
+  lockIdleMinutes: 0,
   askDownload: false,
   downloadDir: '',
   newtabClock: true,
@@ -82,7 +83,7 @@ const DEFAULT_SETTINGS = {
   windowBounds: null
 };
 
-let settings, bookmarks, history, downloads, session, permissions;
+let settings, bookmarks, history, downloads, session, permissions, lock;
 
 function init() {
   settings = new JsonFile('settings', DEFAULT_SETTINGS);
@@ -98,10 +99,12 @@ function init() {
   downloads = new JsonFile('downloads', []);
   session = new JsonFile('session', { windows: [] });
   permissions = new JsonFile('permissions', {});
+  // senha para abrir: guarda so o resultado embaralhado (scrypt), nunca a senha
+  lock = new JsonFile('lock', {});
 }
 
 function flushAll() {
-  for (const f of [settings, bookmarks, history, downloads, session, permissions]) f && f.flush();
+  for (const f of [settings, bookmarks, history, downloads, session, permissions, lock]) f && f.flush();
 }
 
 module.exports = {
@@ -109,6 +112,7 @@ module.exports = {
   flushAll,
   DEFAULT_SETTINGS,
   get settings() { return settings; },
+  get lock() { return lock; },
   get bookmarks() { return bookmarks; },
   get history() { return history; },
   get downloads() { return downloads; },

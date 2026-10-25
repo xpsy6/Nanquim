@@ -2,7 +2,7 @@
 // Cuida de janelas, abas, paineis laterais, downloads, permissoes, historico e sessao.
 const {
   app, BrowserWindow, WebContentsView, ipcMain, session, protocol, Menu, shell,
-  clipboard, ClipboardItem, dialog, net, desktopCapturer, nativeImage, webContents
+  clipboard, ClipboardItem, dialog, net, desktopCapturer, nativeImage, webContents, powerMonitor
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -428,6 +428,7 @@ function buildState(win) {
       loaded: nq.panelViews.has(p.id)
     })),
     panelOpen: nq.panelOpen,
+    lockOn: lockEnabled(),
     findOpen: nq.findOpen,
     blockedTotal: adblock.total
   };
@@ -1465,6 +1466,8 @@ function handleKey(win, input, fromUI) {
   const act = (fn) => { fn(); return true; };
 
   if (key === 'escape' && nq.findOpen) return act(() => closeFind(win));
+  // Ctrl+Shift+L: bloquear agora (pede a senha para voltar)
+  if (ctrl && shift && !alt && key === 'l') return act(() => { if (!lockNow()) openInternal(win, 'settings', 'privacidade'); });
   if (key === 'f5' || (ctrl && key === 'r')) return act(() => wc && ((shift || ctrl && key === 'f5') ? wc.reloadIgnoringCache() : wc.reload()));
   if (key === 'f6' || (ctrl && key === 'l') || (alt && key === 'd') || (ctrl && key === 'e')) return act(() => { win.webContents.focus(); win.webContents.send('command', { cmd: 'focusAddress' }); });
   if (key === 'f11') return act(() => win.setFullScreen(!win.isFullScreen()));
@@ -1644,7 +1647,7 @@ function scheduleSessionSave() {
 }
 
 function saveSession(now) {
-  if (sessionLocked) return;
+  if (sessionLocked || !browserOpen) return;
   store.session.data = {
     windows: allWindows().filter(w => !w.nq.isPrivate).map(w => ({
       active: Math.max(0, w.nq.tabs.findIndex(t => t.id === w.nq.activeId)),
@@ -1924,6 +1927,7 @@ const uiActions = {
       case 'savePage': t && savePage(win, t); break;
       case 'devtools': wc && wc.toggleDevTools(); break;
       case 'snapshot': win.webContents.send('command', { cmd: 'snapshot' }); break;
+      case 'lock': if (!lockNow()) openInternal(win, 'settings', 'privacidade'); break;
       case 'fullscreen': win.setFullScreen(!win.isFullScreen()); break;
       case 'find': openFind(win); break;
       case 'reopen': reopenClosed(win); break;
@@ -2059,7 +2063,7 @@ const internalApi = {
     return true;
   },
   resetSettings: () => {
-    const keep = { windowBounds: S().windowBounds };
+    const keep = { windowBounds: S().windowBounds, lockGuard: S().lockGuard };
     store.settings.data = { ...structuredClone(store.DEFAULT_SETTINGS), ...keep };
     store.settings.save();
     broadcastSettings();
@@ -2186,6 +2190,29 @@ const internalApi = {
   update: () => updateState,
   checkUpdates: () => { checkUpdates(); return updateState; },
   installUpdate: () => { installUpdate(); return true; },
+  lockInfo: () => ({ enabled: lockEnabled(), hasHint: !!(store.lock.data && store.lock.data.hint), idleMinutes: S().lockIdleMinutes || 0 }),
+  lockSet: async ({ current, password, hint } = {}) => {
+    if (lockEnabled()) {
+      const v = await verifyPassword(current);
+      if (!v.ok) return { ok: false, error: v.waitMs ? 'Muitas tentativas erradas. Espere um pouco.' : 'A senha atual não confere.' };
+    }
+    password = String(password || '');
+    hint = String(hint || '').trim();
+    if (password.length < 4) return { ok: false, error: 'A senha precisa ter pelo menos 4 caracteres.' };
+    if (hint && hint.toLowerCase().includes(password.toLowerCase())) return { ok: false, error: 'A dica não pode ter a senha dentro dela.' };
+    await setPassword(password, hint);
+    broadcastState();
+    return { ok: true };
+  },
+  lockRemove: async ({ current } = {}) => {
+    if (!lockEnabled()) return { ok: true };
+    const v = await verifyPassword(current);
+    if (!v.ok) return { ok: false, error: v.waitMs ? 'Muitas tentativas erradas. Espere um pouco.' : 'A senha atual não confere.' };
+    clearPassword();
+    broadcastState();
+    return { ok: true };
+  },
+  lockNow: () => lockNow(),
   openFolder: (which) => shell.openPath(which === 'data' ? app.getPath('userData') : (S().downloadDir || app.getPath('downloads')))
 };
 
@@ -2240,6 +2267,180 @@ function housekeeping() {
   }
 }
 
+// ---------- senha para abrir o Nanquim ----------
+// A senha nunca e guardada: so o resultado do scrypt (um embaralhamento lento de proposito, com sal),
+// que serve para conferir a senha mas nao para descobrir qual ela e.
+// Sem a senha, nenhuma janela, aba ou painel e criado. Esquecer a senha so libera a entrada
+// depois de apagar os logins dos sites, o historico e as abas, para ninguem usar isso de atalho.
+const crypto = require('crypto');
+const scryptAsync = require('util').promisify(crypto.scrypt);
+const LOCK_HTML = path.join(ROOT, 'ui', 'lock.html');
+const PRELOAD_LOCK = path.join(ROOT, 'preload', 'lock.js');
+const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 };
+let lockWin = null;
+let lockMode = null; // 'start' (ao abrir o Nanquim) ou 'pause' (bloqueado com o navegador aberto)
+let browserOpen = false;
+let pendingUrls = [];
+let lockBusy = false;
+
+function lockEnabled() { const d = store.lock && store.lock.data; return !!(d && d.hash && d.salt); }
+
+async function hashPassword(pw, saltHex) {
+  const key = await scryptAsync(String(pw).normalize('NFC'), Buffer.from(saltHex, 'hex'), 32, SCRYPT);
+  return key.toString('hex');
+}
+
+async function setPassword(pw, hint) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  store.lock.data = { v: 1, hash: await hashPassword(pw, salt), salt, hint: String(hint || '').slice(0, 80), fails: 0, until: 0 };
+  store.lock.save(true);
+  setLockGuard(true);
+}
+
+function clearPassword() { store.lock.data = {}; store.lock.save(true); setLockGuard(false); }
+
+// marca nas configuracoes que existe senha. Se alguem apagar o arquivo da senha por fora do Nanquim,
+// a marca continua e o Nanquim so deixa entrar apagando os logins (igual ao "esqueci a senha").
+function setLockGuard(on) {
+  if (!!S().lockGuard === on) return;
+  S().lockGuard = on;
+  store.settings.save(true);
+}
+
+function lockWaitMs() { return Math.max(0, (store.lock.data.until || 0) - Date.now()); }
+function lockHint() { const d = store.lock.data; return d.fails >= 2 && d.hint ? d.hint : ''; }
+
+// confere a senha contando as tentativas erradas: a partir da 5a, espera 30 s, depois 1 min, 2 min... (ate 15 min)
+async function verifyPassword(pw) {
+  if (!lockEnabled()) return { ok: true };
+  const wait = lockWaitMs();
+  if (wait > 0) return { ok: false, waitMs: wait };
+  const d = store.lock.data;
+  const got = Buffer.from(await hashPassword(String(pw || ''), d.salt), 'hex');
+  const ref = Buffer.from(d.hash, 'hex');
+  const ok = got.length === ref.length && crypto.timingSafeEqual(got, ref);
+  if (ok) { d.fails = 0; d.until = 0; }
+  else {
+    d.fails = (d.fails || 0) + 1;
+    if (d.fails >= 5) d.until = Date.now() + Math.min(15 * 60000, 30000 * Math.pow(2, d.fails - 5));
+  }
+  store.lock.save(true);
+  return ok ? { ok: true } : { ok: false, waitMs: lockWaitMs() };
+}
+
+function showLock(mode) {
+  lockMode = mode;
+  if (lockWin && !lockWin.isDestroyed()) { lockWin.show(); lockWin.focus(); return; }
+  const t = themeOf();
+  const win = new BrowserWindow({
+    width: 440, height: 600, resizable: false, maximizable: false, fullscreenable: false,
+    show: false, center: true, title: 'Nanquim', icon: ICON, backgroundColor: t.page,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: process.platform === 'darwin' ? undefined : { color: t.page, symbolColor: t.fg, height: 46 },
+    webPreferences: { preload: PRELOAD_LOCK, contextIsolation: true, sandbox: true, spellcheck: false, devTools: false }
+  });
+  lockWin = win;
+  win.setMenu(null);
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  win.loadFile(LOCK_HTML);
+  win.once('ready-to-show', () => { win.show(); win.focus(); });
+  win.on('closed', () => {
+    if (lockWin === win) lockWin = null;
+    // fechou a tela de senha sem entrar: fecha o Nanquim inteiro, inclusive as janelas escondidas
+    if (lockMode) { lockMode = null; app.quit(); }
+  });
+}
+
+// bloqueia com o navegador aberto: esconde todas as janelas e mostra a tela de senha
+function lockNow() {
+  if (!lockEnabled() || lockMode || !browserOpen) return false;
+  for (const w of allWindows()) {
+    for (const t of w.nq.tabs) { try { if (t.view && t.view.webContents.isDevToolsOpened()) t.view.webContents.closeDevTools(); } catch { /* ignorado */ } }
+    w.nq.hiddenByLock = true;
+    w.hide();
+  }
+  showLock('pause');
+  return true;
+}
+
+function openBrowser() {
+  browserOpen = true;
+  const urls = pendingUrls.splice(0);
+  const saved = store.session.data.windows || [];
+  if (S().startup === 'restore' && saved.length) {
+    saved.forEach((w, i) => createWindow({ restoredTabs: w.tabs, activeIndex: w.active, urls: i === 0 ? urls : [] }));
+  } else {
+    createWindow({ urls });
+  }
+}
+
+function unlockDone() {
+  const mode = lockMode;
+  lockMode = null; // a partir daqui fechar a tela de senha nao fecha o Nanquim
+  if (mode === 'start') openBrowser();
+  else {
+    for (const w of allWindows()) if (w.nq.hiddenByLock) { w.nq.hiddenByLock = false; w.show(); }
+    const win = focusedWindow();
+    if (win) { win.focus(); pendingUrls.splice(0).forEach(u => createTab(win, u)); }
+  }
+  const lw = lockWin;
+  setTimeout(() => { if (lw && !lw.isDestroyed()) lw.close(); }, mode === 'start' ? 700 : 380);
+}
+
+// "esqueci a senha": apaga logins, historico e abas, tira a senha e entra
+async function forgetPassword() {
+  if (lockMode === 'tamper') lockMode = 'start';
+  if (lockMode === 'pause') {
+    // as abas abertas por tras ainda estao logadas: fecha tudo sem guardar
+    sessionLocked = true;
+    for (const w of allWindows()) { try { w.destroy(); } catch { /* ignorado */ } }
+    lockMode = 'start';
+  }
+  const ses = session.defaultSession;
+  await withTimeout(ses.clearStorageData(), 20000);
+  await withTimeout(ses.clearCache(), 20000);
+  await withTimeout(ses.clearAuthCache(), 5000);
+  store.history.data = [];
+  store.history.save(true);
+  store.session.data = { windows: [] };
+  store.session.save(true);
+  clearPassword();
+  sessionLocked = false;
+}
+
+const fromLockScreen = (e) => !!lockWin && !lockWin.isDestroyed() && e.sender === lockWin.webContents;
+
+ipcMain.handle('lock:info', (e) => {
+  if (!fromLockScreen(e)) return null;
+  return { theme: S().theme, accent: S().accent, enso: S().enso, mode: lockMode, waitMs: lockWaitMs(), hint: lockHint() };
+});
+
+ipcMain.handle('lock:try', async (e, pw) => {
+  // sem o arquivo da senha (modo 'tamper') nenhuma senha serve: so da para entrar apagando os logins
+  if (!fromLockScreen(e) || !lockMode || lockMode === 'tamper' || lockBusy) return { ok: false };
+  lockBusy = true;
+  try {
+    const r = await verifyPassword(pw);
+    if (r.ok) { unlockDone(); return { ok: true }; }
+    return { ok: false, waitMs: r.waitMs || 0, hint: lockHint() };
+  } finally { lockBusy = false; }
+});
+
+ipcMain.handle('lock:forget', async (e) => {
+  if (!fromLockScreen(e) || !lockMode) return false;
+  await forgetPassword();
+  unlockDone();
+  return true;
+});
+
+// bloqueio automatico: depois de X minutos sem mexer no computador, e quando o Windows e bloqueado
+function autoLockCheck() {
+  const min = S().lockIdleMinutes || 0;
+  if (!min || !lockEnabled() || lockMode || !browserOpen) return;
+  try { if (powerMonitor.getSystemIdleTime() >= min * 60) lockNow(); } catch { /* ignorado */ }
+}
+
 // ---------- ciclo de vida ----------
 
 function urlsFromArgv(argv) {
@@ -2249,6 +2450,12 @@ function urlsFromArgv(argv) {
 
 app.on('second-instance', (e, argv) => {
   const urls = urlsFromArgv(argv);
+  // com a tela de senha aberta, nada abre: os links esperam a senha
+  if (lockMode) {
+    pendingUrls.push(...urls);
+    if (lockWin && !lockWin.isDestroyed()) { if (lockWin.isMinimized()) lockWin.restore(); lockWin.show(); lockWin.focus(); }
+    return;
+  }
   const win = focusedWindow();
   if (!win) return createWindow({ urls });
   if (win.isMinimized()) win.restore();
@@ -2259,6 +2466,7 @@ app.on('second-instance', (e, argv) => {
 
 app.on('open-url', (e, url) => {
   e.preventDefault();
+  if (lockMode || !browserOpen) { pendingUrls.push(url); return; }
   const win = focusedWindow();
   if (win) createTab(win, url); else app.whenReady().then(() => createWindow({ urls: [url] }));
 });
@@ -2282,23 +2490,23 @@ app.whenReady().then(async () => {
 
   await loadExtensions();
 
-  const argvUrls = urlsFromArgv(process.argv);
-  const saved = store.session.data.windows || [];
-  if (S().startup === 'restore' && saved.length) {
-    saved.forEach((w, i) => createWindow({ restoredTabs: w.tabs, activeIndex: w.active, urls: i === 0 ? argvUrls : [] }));
-    if (argvUrls.length) argvUrls.forEach(u => createTab(allWindows()[0], u));
-  } else {
-    createWindow({ urls: argvUrls });
-  }
+  pendingUrls.push(...urlsFromArgv(process.argv));
+  if (lockEnabled()) { setLockGuard(true); showLock('start'); }
+  else if (S().lockGuard) showLock('tamper');
+  else openBrowser();
 
   ensurePanelIcons();
   setupUpdater();
   setInterval(sampleMetrics, 3000);
   setInterval(housekeeping, 20000);
+  setInterval(autoLockCheck, 15000);
+  for (const ev of ['lock-screen', 'suspend']) {
+    try { powerMonitor.on(ev, () => { if ((S().lockIdleMinutes || 0) > 0) lockNow(); }); } catch { /* ignorado */ }
+  }
 });
 
 app.on('before-quit', () => {
-  if (!sessionLocked) { saveSession(true); sessionLocked = true; }
+  if (!sessionLocked && browserOpen) { saveSession(true); sessionLocked = true; }
   store.flushAll();
 });
 

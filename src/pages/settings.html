@@ -87,6 +87,40 @@
 
       <section id="privacidade">
         <h2>Privacidade e bloqueio</h2>
+        <div class="card" id="lock-card">
+          <div class="opt"><div><b>Senha para abrir o Nanquim</b><small id="lock-info">Carregando...</small></div><button class="btn primary" id="lock-create" hidden>Criar senha</button></div>
+          <div class="lock-actions" id="lock-actions" hidden>
+            <button class="btn" id="lock-now">Bloquear agora <kbd>Ctrl ⇧ L</kbd></button>
+            <button class="btn" id="lock-change">Trocar senha</button>
+            <button class="btn danger" id="lock-off">Tirar senha</button>
+          </div>
+          <form class="lock-form" id="lock-form" hidden autocomplete="off">
+            <div id="lf-cur-box">
+              <div class="label">Senha atual</div>
+              <input class="field" type="password" id="lf-cur" autocomplete="off">
+            </div>
+            <div id="lf-new-box">
+              <div class="label">Nova senha</div>
+              <input class="field" type="password" id="lf-pw" autocomplete="new-password" placeholder="Pelo menos 4 caracteres">
+              <div class="label">Repita a nova senha</div>
+              <input class="field" type="password" id="lf-pw2" autocomplete="new-password">
+              <div class="label">Dica (opcional)</div>
+              <input class="field" id="lf-hint" maxlength="80" placeholder="Aparece depois de errar 2 vezes. Não escreva a senha aqui.">
+            </div>
+            <p class="lf-err" id="lf-err"></p>
+            <div class="inline">
+              <button class="btn primary" type="submit" id="lf-go">Salvar senha</button>
+              <button class="btn ghost" type="button" id="lf-cancel">Cancelar</button>
+            </div>
+          </form>
+          <div class="opt" id="lock-idle" hidden><div><b>Bloquear sozinho</b><small>Depois de um tempo sem mexer no computador, e também quando o Windows é bloqueado.</small></div>
+            <select class="field small" data-num="lockIdleMinutes">
+              <option value="0">Nunca</option><option value="5">5 min</option><option value="10">10 min</option>
+              <option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hora</option>
+            </select>
+          </div>
+          <p class="note lock-note">Sem a senha, ninguém abre o Nanquim neste computador nem vê suas abas e contas. Se você esquecer a senha, dá para entrar, mas antes o Nanquim apaga os logins dos sites, o histórico e as abas abertas.</p>
+        </div>
         <div class="card">
           <div class="opt"><div><b>Bloquear anúncios e rastreadores</b><small id="ab-info">Carregando lista...</small></div><button class="switch" data-bool="adblock"></button></div>
           <div class="label">Sites liberados (bloqueador desligado)</div>
