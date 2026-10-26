@@ -41,13 +41,10 @@ async function init() {
   drawEnso($('#enso'), { paint: true, seed: 5 });
   if (info.mode === 'pause') $('#sub').textContent = 'Nanquim bloqueado. Digite sua senha para voltar';
   if (info.mode === 'tamper') {
-    // o arquivo da senha sumiu (apagado por fora): so da para entrar apagando os logins
+    // o arquivo da senha foi apagado por fora: nao tem como entrar por aqui
     $('#v-pass').hidden = true;
-    $('#v-forgot').hidden = false;
-    $('#f-title').textContent = 'A senha foi apagada por fora';
-    $('#f-lead').textContent = 'O arquivo da senha deste Nanquim sumiu. Para ninguém entrar nas suas contas desse jeito, o Nanquim só abre depois de apagar:';
-    $('#back').hidden = true;
-    $('#confirm').focus();
+    $('#v-tamper').hidden = false;
+    $('#v-tamper').classList.add('rise');
     return;
   }
   if (info.waitMs > 0) waitFor(info.waitMs, info.hint);
@@ -78,33 +75,6 @@ form.addEventListener('submit', async (e) => {
 $('#eye').addEventListener('click', () => {
   pw.type = pw.type === 'password' ? 'text' : 'password';
   pw.focus();
-});
-
-// ---------- esqueci a senha ----------
-$('#forgot').addEventListener('click', () => {
-  $('#v-pass').hidden = true;
-  $('#v-forgot').hidden = false;
-  $('#v-forgot').classList.add('rise');
-  $('#confirm').value = '';
-  $('#wipe').disabled = true;
-  $('#confirm').focus();
-});
-$('#back').addEventListener('click', () => {
-  $('#v-forgot').hidden = true;
-  $('#v-pass').hidden = false;
-  pw.focus();
-});
-$('#confirm').addEventListener('input', (e) => { $('#wipe').disabled = e.target.value.trim().toUpperCase() !== 'APAGAR'; });
-$('#confirm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('#wipe').disabled) $('#wipe').click(); });
-$('#wipe').addEventListener('click', async () => {
-  $('#wipe').disabled = true;
-  $('#back').disabled = true;
-  $('#wipe').textContent = 'Apagando...';
-  await window.lock.forget();
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('#v-forgot').hidden && !$('#back').hidden) $('#back').click();
 });
 
 init();

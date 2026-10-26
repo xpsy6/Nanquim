@@ -28,7 +28,7 @@ O instalador cria atalhos na Área de Trabalho e no menu Iniciar e coloca o Nanq
 - Cores escolhíveis: o círculo da nova aba e os detalhes (carimbo, abas, botões) têm cor própria, com combinações prontas (vermelho, roxo, roxo e vermelho, azul, verde, dourado, tinta) ou qualquer cor
 - Ícones oficiais dos sites na barra lateral e nos atalhos da nova aba (embutidos, aparecem até sem internet)
 - Print igual ao do Opera (Ctrl+Shift+5 ou o botão de câmera): escolha uma área, a área visível ou a página inteira, desenhe com caneta, marca-texto, seta, retângulo, texto e desfoque. A imagem já fica copiada para colar com Ctrl+V; salvar no computador só quando você pedir
-- Senha para abrir (Configurações, Privacidade e bloqueio): sem ela ninguém abre o Nanquim nem vê suas abas e contas. Dá para bloquear na hora (Ctrl+Shift+L) ou sozinho depois de um tempo parado. Se esquecer a senha, dá para entrar, mas antes o Nanquim apaga os logins dos sites, o histórico e as abas. A senha não fica guardada: só um código embaralhado que serve para conferir
+- Senha para abrir (Configurações, Privacidade e bloqueio): sem ela ninguém abre o Nanquim nem vê suas abas e contas. Dá para bloquear na hora (Ctrl+Shift+L) ou sozinho depois de um tempo parado. Não tem "esqueci a senha": sem ela não entra. Se esquecer, o único jeito é apagar a pasta `%APPDATA%\Nanquim`, o que apaga tudo (logins, favoritos, histórico). A senha não fica guardada: só um código embaralhado que serve para conferir
 - Login do Google: na página de login o Nanquim usa a identidade original do motor (Electron), que o Google aceita no fluxo para navegadores embutidos
 - Ferramentas do desenvolvedor (F12) e extensões do Chrome descompactadas (experimental)
 

@@ -77,23 +77,12 @@
     .go:hover { filter: brightness(1.08); }
     .go:active { transform: scale(.97); }
     .go:disabled { opacity: .4; cursor: default; filter: none; }
-    .link { margin-top: auto; background: none; border: 0; color: var(--faint); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 6px; }
-    .link:hover { color: var(--muted); }
 
     /* esqueci a senha */
-    .forgot { text-align: left; max-width: 330px; }
-    .forgot h2 { font: 800 22px/1.2 'Mincho', 'Yu Mincho', Georgia, serif; margin: 28px 0 12px; }
+    .forgot { text-align: center; max-width: 320px; }
+    .mark.small { width: 96px; height: 96px; margin-top: 70px; }
+    .forgot h2 { font: 800 24px/1.2 'Mincho', 'Yu Mincho', Georgia, serif; margin: 18px 0 12px; }
     .forgot p { color: var(--muted); margin: 0 0 10px; }
-    .forgot ul { margin: 0 0 12px; padding-left: 18px; color: var(--text); }
-    .forgot li { margin: 2px 0; }
-    .forgot .keep { color: var(--muted); }
-    .confirm { width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line2); background: var(--s1); outline: none; font: 400 14px/1 'Plex Mono', Consolas, monospace; letter-spacing: .08em; user-select: text; }
-    .confirm:focus { border-color: var(--accent); }
-    .row { display: flex; gap: 8px; margin-top: 14px; }
-    .btn { border: 1px solid var(--line2); background: none; border-radius: 999px; padding: 9px 16px; cursor: pointer; font-weight: 500; }
-    .btn:hover { background: var(--s1); }
-    .btn.danger { background: var(--danger); border-color: transparent; color: #fff; }
-    .btn.danger:disabled { opacity: .35; cursor: default; }
     .rise { animation: rise .45s var(--out) both; }
     @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
   </style>
@@ -143,25 +132,15 @@
       <div class="msg" id="msg"></div>
     </form>
     <button class="go" id="go" form="f" type="submit">Entrar</button>
-    <button class="link" id="forgot" type="button">Esqueci a senha</button>
   </div>
 
-  <div class="view" id="v-forgot" hidden>
+  <div class="view" id="v-tamper" hidden>
+    <div class="mark small">
+      <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><g filter="url(#stamp)"><rect x="1.5" y="1.5" width="29" height="29" rx="5" fill="var(--accent)"/><text x="16" y="23.6" text-anchor="middle" font-family="Mincho" font-weight="800" font-size="20" fill="var(--bg)">墨</text></g></svg>
+    </div>
     <div class="forgot">
-      <h2 id="f-title">Esqueceu a senha?</h2>
-      <p id="f-lead">Dá para entrar sem ela. Só que, para ninguém usar isso para entrar nas suas contas, o Nanquim apaga antes:</p>
-      <ul>
-        <li>os logins dos sites (WhatsApp, Google, Instagram e todos os outros)</li>
-        <li>o histórico</li>
-        <li>as abas que estavam abertas</li>
-      </ul>
-      <p class="keep">Favoritos e configurações continuam. A senha é tirada e você pode criar outra depois.</p>
-      <p>Para confirmar, digite <b>APAGAR</b>:</p>
-      <input class="confirm" id="confirm" spellcheck="false" autocomplete="off">
-      <div class="row">
-        <button class="btn" id="back" type="button">Voltar</button>
-        <button class="btn danger" id="wipe" type="button" disabled>Apagar e entrar</button>
-      </div>
+      <h2>Nanquim travado</h2>
+      <p>O arquivo da senha foi apagado por fora do Nanquim. Por segurança, ele não abre desse jeito.</p>
     </div>
   </div>
 

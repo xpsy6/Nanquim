@@ -2095,7 +2095,10 @@ const internalApi = {
     }
     if (downloads) { dlList = dlList.filter(d => d.state === 'progressing'); persistDownloads(); pushDownloads(true); }
     if (cache) await session.defaultSession.clearCache();
-    if (cookies) await session.defaultSession.clearStorageData({ storages: ['cookies', 'localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'websql', 'shadercache'] });
+    if (cookies) {
+      await session.defaultSession.clearStorageData({ storages: ['cookies', 'localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'websql', 'shadercache'] });
+      if (lockEnabled()) await setCookieGuard(true);
+    }
     return true;
   },
   bookmarks: () => store.bookmarks.data,
@@ -2270,8 +2273,7 @@ function housekeeping() {
 // ---------- senha para abrir o Nanquim ----------
 // A senha nunca e guardada: so o resultado do scrypt (um embaralhamento lento de proposito, com sal),
 // que serve para conferir a senha mas nao para descobrir qual ela e.
-// Sem a senha, nenhuma janela, aba ou painel e criado. Esquecer a senha so libera a entrada
-// depois de apagar os logins dos sites, o historico e as abas, para ninguem usar isso de atalho.
+// Sem a senha, nenhuma janela, aba ou painel e criado, e nao existe atalho para entrar sem ela.
 const crypto = require('crypto');
 const scryptAsync = require('util').promisify(crypto.scrypt);
 const LOCK_HTML = path.join(ROOT, 'ui', 'lock.html');
@@ -2299,12 +2301,25 @@ async function setPassword(pw, hint) {
 
 function clearPassword() { store.lock.data = {}; store.lock.save(true); setLockGuard(false); }
 
-// marca nas configuracoes que existe senha. Se alguem apagar o arquivo da senha por fora do Nanquim,
-// a marca continua e o Nanquim so deixa entrar apagando os logins (igual ao "esqueci a senha").
+// Marca que existe senha em dois lugares: nas configuracoes e num cookie guardado junto com os logins
+// dos sites. Se alguem apagar o arquivo da senha por fora do Nanquim, a marca continua e ele nao abre.
+// Para tirar a marca do cookie e preciso apagar os cookies, o que tambem apaga os logins.
+const GUARD_URL = 'https://trava.nanquim.invalid/';
+const GUARD_NAME = 'nq_trava';
 function setLockGuard(on) {
-  if (!!S().lockGuard === on) return;
-  S().lockGuard = on;
-  store.settings.save(true);
+  if (!!S().lockGuard !== on) { S().lockGuard = on; store.settings.save(true); }
+  setCookieGuard(on);
+}
+async function setCookieGuard(on) {
+  const ses = session.defaultSession;
+  try {
+    if (on) await ses.cookies.set({ url: GUARD_URL, name: GUARD_NAME, value: '1', secure: true, httpOnly: true, expirationDate: Math.floor(Date.now() / 1000) + 10 * 365 * 86400 });
+    else await ses.cookies.remove(GUARD_URL, GUARD_NAME);
+    await ses.cookies.flushStore();
+  } catch { /* ignorado */ }
+}
+async function hasCookieGuard() {
+  try { return (await session.defaultSession.cookies.get({ url: GUARD_URL, name: GUARD_NAME })).length > 0; } catch { return false; }
 }
 
 function lockWaitMs() { return Math.max(0, (store.lock.data.until || 0) - Date.now()); }
@@ -2388,27 +2403,6 @@ function unlockDone() {
   setTimeout(() => { if (lw && !lw.isDestroyed()) lw.close(); }, mode === 'start' ? 700 : 380);
 }
 
-// "esqueci a senha": apaga logins, historico e abas, tira a senha e entra
-async function forgetPassword() {
-  if (lockMode === 'tamper') lockMode = 'start';
-  if (lockMode === 'pause') {
-    // as abas abertas por tras ainda estao logadas: fecha tudo sem guardar
-    sessionLocked = true;
-    for (const w of allWindows()) { try { w.destroy(); } catch { /* ignorado */ } }
-    lockMode = 'start';
-  }
-  const ses = session.defaultSession;
-  await withTimeout(ses.clearStorageData(), 20000);
-  await withTimeout(ses.clearCache(), 20000);
-  await withTimeout(ses.clearAuthCache(), 5000);
-  store.history.data = [];
-  store.history.save(true);
-  store.session.data = { windows: [] };
-  store.session.save(true);
-  clearPassword();
-  sessionLocked = false;
-}
-
 const fromLockScreen = (e) => !!lockWin && !lockWin.isDestroyed() && e.sender === lockWin.webContents;
 
 ipcMain.handle('lock:info', (e) => {
@@ -2417,7 +2411,7 @@ ipcMain.handle('lock:info', (e) => {
 });
 
 ipcMain.handle('lock:try', async (e, pw) => {
-  // sem o arquivo da senha (modo 'tamper') nenhuma senha serve: so da para entrar apagando os logins
+  // sem o arquivo da senha (modo 'tamper') nenhuma senha serve e nao tem como entrar
   if (!fromLockScreen(e) || !lockMode || lockMode === 'tamper' || lockBusy) return { ok: false };
   lockBusy = true;
   try {
@@ -2425,13 +2419,6 @@ ipcMain.handle('lock:try', async (e, pw) => {
     if (r.ok) { unlockDone(); return { ok: true }; }
     return { ok: false, waitMs: r.waitMs || 0, hint: lockHint() };
   } finally { lockBusy = false; }
-});
-
-ipcMain.handle('lock:forget', async (e) => {
-  if (!fromLockScreen(e) || !lockMode) return false;
-  await forgetPassword();
-  unlockDone();
-  return true;
 });
 
 // bloqueio automatico: depois de X minutos sem mexer no computador, e quando o Windows e bloqueado
@@ -2492,7 +2479,7 @@ app.whenReady().then(async () => {
 
   pendingUrls.push(...urlsFromArgv(process.argv));
   if (lockEnabled()) { setLockGuard(true); showLock('start'); }
-  else if (S().lockGuard) showLock('tamper');
+  else if (S().lockGuard || await hasCookieGuard()) showLock('tamper');
   else openBrowser();
 
   ensurePanelIcons();
