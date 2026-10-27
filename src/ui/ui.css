@@ -97,7 +97,8 @@ body.fullscreen #top { padding-right: 10px; }
   height: 32px; border-radius: 9px;
   display: flex; align-items: center; gap: 9px;
   padding: 0 6px 0 11px;
-  color: var(--muted);
+  /* texto das abas claro o bastante para ler; a aba ativa fica com a cor cheia */
+  color: color-mix(in oklab, var(--text) 80%, var(--frame));
   font-size: 13px;
   container-type: inline-size;
   transition: background .18s var(--ease), color .18s var(--ease);
@@ -106,8 +107,10 @@ body.fullscreen #top { padding-right: 10px; }
 .tab.active { background: var(--card); color: var(--text); }
 .tab.enter { animation: tab-in .42s var(--spring) both; }
 @keyframes tab-in { from { flex-basis: 0; min-width: 0; padding: 0; opacity: 0; } }
-.tab.discarded .tab-title { font-style: italic; opacity: .6; }
-.tab.discarded .tab-icon .glyph { border-style: dashed; }
+/* aba dormindo: so um pouco mais suave, sem perder a leitura */
+.tab.discarded .tab-title { opacity: .86; }
+.tab.discarded .tab-icon img { opacity: .9; }
+body[data-theme="tinta"] .tab-icon img.mono { filter: invert(1) brightness(.92); }
 .tab.pinned { flex: 0 0 40px; justify-content: center; padding: 0; }
 .tab.pinned .tab-title, .tab.pinned .tab-close { display: none; }
 .tab.dragging { opacity: .35; }

@@ -307,7 +307,13 @@ function updateTab(el, t) {
     else if (t.favicon) {
       ic.innerHTML = '';
       const img = new Image();
-      img.onerror = () => { ic.innerHTML = `<span class="glyph">${esc(letterFor(t.title, t.url))}</span>`; };
+      if (t.faviconMono) img.className = 'mono';
+      // se o icone da pagina nao carregar, tenta o icone guardado do site e, por ultimo, a letra
+      let backup = t.faviconBackup;
+      img.onerror = () => {
+        if (backup) { const b = backup; backup = null; img.className = ''; img.src = b; return; }
+        ic.innerHTML = `<span class="glyph">${esc(letterFor(t.title, t.url))}</span>`;
+      };
       img.src = t.favicon;
       ic.appendChild(img);
     } else ic.innerHTML = `<span class="glyph">${esc(letterFor(t.title, t.url))}</span>`;

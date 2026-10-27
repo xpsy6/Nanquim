@@ -83,7 +83,7 @@ const DEFAULT_SETTINGS = {
   windowBounds: null
 };
 
-let settings, bookmarks, history, downloads, session, permissions, lock;
+let settings, bookmarks, history, downloads, session, permissions, lock, favicons;
 
 function init() {
   settings = new JsonFile('settings', DEFAULT_SETTINGS);
@@ -101,10 +101,12 @@ function init() {
   permissions = new JsonFile('permissions', {});
   // senha para abrir: guarda so o resultado embaralhado (scrypt), nunca a senha
   lock = new JsonFile('lock', {});
+  // icones dos sites ja visitados (por endereco), para as abas dormindo tambem mostrarem o icone
+  favicons = new JsonFile('favicons', {});
 }
 
 function flushAll() {
-  for (const f of [settings, bookmarks, history, downloads, session, permissions, lock]) f && f.flush();
+  for (const f of [settings, bookmarks, history, downloads, session, permissions, lock, favicons]) f && f.flush();
 }
 
 module.exports = {
@@ -113,6 +115,7 @@ module.exports = {
   DEFAULT_SETTINGS,
   get settings() { return settings; },
   get lock() { return lock; },
+  get favicons() { return favicons; },
   get bookmarks() { return bookmarks; },
   get history() { return history; },
   get downloads() { return downloads; },

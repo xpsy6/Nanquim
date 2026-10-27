@@ -159,6 +159,7 @@ function internalHandler(request) {
   const u = new URL(request.url);
   let host = u.hostname;
   const p = decodeURIComponent(u.pathname);
+  if (host === 'favicon') return faviconResponse(p);
   let file;
   if (p.startsWith('/fonts/')) file = path.join(FONTS_DIR, path.basename(p));
   else if (p === '/' || p === '') {
@@ -166,6 +167,107 @@ function internalHandler(request) {
     file = path.join(PAGES_DIR, host + '.html');
   } else file = path.join(PAGES_DIR, path.basename(p));
   return net.fetch(pathToFileURL(file).toString());
+}
+
+// ---------- icones das abas ----------
+// Cada site visitado tem o icone guardado (por endereco). Assim as abas dormindo, e as que voltam
+// ao abrir o Nanquim, mostram o icone sem precisar carregar a pagina. Para sites que ainda nao
+// tem icone guardado, ele e buscado por tras. A interface pede os icones por nanquim://favicon/,
+// com um codigo que muda a cada vez que o Nanquim abre, para os sites nao conseguirem espiar a lista.
+const FAV_TOKEN = require('crypto').randomBytes(9).toString('hex');
+const FAV_MAX = 300;
+const favMiss = new Map();
+const favQueue = new Map();
+let favRunning = 0;
+
+function iconHost(url) {
+  try {
+    const u = new URL(url);
+    return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase() : '';
+  } catch { return ''; }
+}
+const iconKey = (host) => host.replace(/^www\./, '');
+function brandKeyOf(key) { return HOST_BRAND[key] || HOST_BRAND[key.split('.').slice(-2).join('.')] || null; }
+
+// referencia curta do icone de um endereco (ou null): { src, mono }
+function iconRef(url) {
+  const host = iconHost(url);
+  if (!host) return null;
+  const key = iconKey(host);
+  const c = store.favicons.data[key];
+  if (c && c.b) return { src: `nanquim://favicon/${FAV_TOKEN}/${encodeURIComponent(key)}?v=${c.t}`, mono: false };
+  const bk = brandKeyOf(key);
+  if (bk && BRAND[bk]) return { src: `nanquim://favicon/${FAV_TOKEN}/${encodeURIComponent(key)}?v=m`, mono: DARK_BRANDS.includes(bk) };
+  return null;
+}
+
+function faviconResponse(p) {
+  const [, token, raw] = p.split('/');
+  const key = raw || '';
+  let type = '', buf = null;
+  if (token === FAV_TOKEN) {
+    const c = store.favicons.data[key];
+    if (c && c.b) { type = c.y; buf = Buffer.from(c.b, 'base64'); }
+    else {
+      const bk = brandKeyOf(key);
+      const m = bk && BRAND[bk] && /^data:([^;,]+)(;base64)?,(.*)$/s.exec(BRAND[bk]);
+      if (m) { type = m[1]; buf = m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3])); }
+    }
+  }
+  if (!buf) return new Response('', { status: 404 });
+  return new Response(buf, { headers: { 'content-type': type, 'cache-control': 'max-age=604800' } });
+}
+
+function storeIcon(key, dataUrl, from) {
+  const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl || '');
+  if (!m || m[2].length > 90000) return false;
+  store.favicons.data[key] = { y: m[1], b: m[2], u: from || '', t: Date.now() };
+  const all = Object.entries(store.favicons.data);
+  if (all.length > FAV_MAX) {
+    all.sort((a, b) => a[1].t - b[1].t);
+    for (const [k] of all.slice(0, all.length - FAV_MAX)) delete store.favicons.data[k];
+  }
+  store.favicons.save();
+  return true;
+}
+
+// a pagina mostrou um icone: guarda (so janelas normais, nunca as anonimas)
+function rememberIcon(pageUrl, iconUrl) {
+  const host = iconHost(pageUrl);
+  if (!host || !iconUrl || iconUrl.startsWith('data:') && iconUrl.length > 120000) return;
+  const key = iconKey(host);
+  const c = store.favicons.data[key];
+  if (c && c.u === iconUrl && Date.now() - c.t < 7 * 86400000) return;
+  const got = iconUrl.startsWith('data:') ? Promise.resolve(iconUrl) : fetchIcon(iconUrl);
+  got.then(d => { if (d && storeIcon(key, d, iconUrl)) broadcastState(); });
+}
+
+// aba dormindo sem icone guardado: busca por tras (no maximo 3 de cada vez)
+function wantIcon(url) {
+  const host = iconHost(url);
+  if (!host) return;
+  const key = iconKey(host);
+  if (store.favicons.data[key] || favQueue.has(key)) return;
+  const miss = favMiss.get(key);
+  if (miss && Date.now() - miss < 3600000) return;
+  favQueue.set(key, host);
+  pumpIcons();
+}
+
+function pumpIcons() {
+  while (favRunning < 3 && favQueue.size) {
+    const [key, host] = favQueue.entries().next().value;
+    favQueue.delete(key);
+    favRunning++;
+    (async () => {
+      const d = await fetchIcon(`https://${host}/favicon.ico`) ||
+        await fetchIcon(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`);
+      if (d && storeIcon(key, d, '')) broadcastState();
+      else if (!d) favMiss.set(key, Date.now());
+      favRunning--;
+      pumpIcons();
+    })();
+  }
 }
 
 // ---------- sessoes (normal, anonima e paineis) ----------
@@ -413,12 +515,21 @@ function buildState(win) {
     private: nq.isPrivate,
     platform: process.platform,
     activeId: nq.activeId,
-    tabs: nq.tabs.map(t => ({
-      id: t.id, title: t.title, url: displayUrl(t.url), favicon: t.favicon, loading: t.loading,
-      audible: t.audible, muted: t.muted, discarded: t.discarded, pinned: t.pinned, crashed: t.crashed
-    })),
+    tabs: nq.tabs.map(t => {
+      // icone da propria pagina quando ela esta aberta; senao, o icone guardado do site
+      let ic = t.favicon ? { src: t.favicon, mono: false, live: true } : null;
+      if (!ic && t.url && /^https?:/.test(t.url)) {
+        ic = iconRef(t.url);
+        if (!ic && !nq.isPrivate) wantIcon(t.url);
+      }
+      return {
+        id: t.id, title: t.title, url: displayUrl(t.url), favicon: ic ? ic.src : null, faviconMono: !!(ic && ic.mono),
+        faviconBackup: ic && ic.live && /^https?:/.test(t.url) ? (iconRef(t.url) || {}).src || null : null,
+        loading: t.loading, audible: t.audible, muted: t.muted, discarded: t.discarded, pinned: t.pinned, crashed: t.crashed
+      };
+    }),
     nav: navState(win),
-    bookmarks: store.bookmarks.data.map(b => ({ id: b.id, title: b.title, url: b.url, favicon: b.favicon })),
+    bookmarks: store.bookmarks.data.map(b => ({ id: b.id, title: b.title, url: b.url, favicon: (iconRef(b.url) || {}).src || b.favicon })),
     settings: {
       theme: s.theme, accent: s.accent, enso: s.enso, bookmarksBar: s.bookmarksBar,
       sidebar: s.sidebar && !nq.isPrivate, adblock: s.adblock
@@ -687,6 +798,7 @@ function wireTab(win, tab) {
 
   wc.on('page-favicon-updated', (e, favicons) => {
     tab.favicon = favicons && favicons[0] || null;
+    if (tab.favicon && !win.nq.isPrivate) rememberIcon(wc.getURL(), tab.favicon);
     update();
   });
 
