@@ -80,7 +80,7 @@ body.fullscreen-page #app { padding: 0; }
 body.platform-darwin #top { padding-left: 84px; padding-right: 10px; }
 body.platform-darwin #seal { display: none; }
 body.fullscreen #top { padding-right: 10px; }
-#seal { width: 32px; height: 32px; flex: none; margin-right: 16px; transform: rotate(-5deg); -webkit-app-region: no-drag; }
+#seal { width: 30px; height: 30px; flex: none; margin-right: 16px; -webkit-app-region: no-drag; }
 .nav { display: flex; flex: none; margin-right: 12px; }
 #private-badge {
   display: flex; align-items: center; gap: 6px; flex: none;
@@ -119,6 +119,7 @@ body[data-theme="tinta"] .tab-icon img.mono { filter: invert(1) brightness(.92);
 .tab.drop-after::after { right: -2px; }
 .tab-icon { width: 16px; height: 16px; flex: none; display: grid; place-items: center; }
 .tab-icon img { width: 16px; height: 16px; object-fit: contain; border-radius: 3px; }
+.tab-icon svg.logo { width: 16px; height: 16px; }
 .glyph {
   width: 16px; height: 16px; border-radius: 50%;
   border: 1px solid var(--line2);
