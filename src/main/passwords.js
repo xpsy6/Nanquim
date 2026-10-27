@@ -22,14 +22,24 @@ function load() {
 
 function save(now = false) {
   clearTimeout(saveTimer);
-  const write = () => {
+  saveTimer = null;
+  if (now) {
     try {
       const tmp = file() + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(data));
       fs.renameSync(tmp, file());
     } catch (err) { console.error('Falha ao salvar senhas', err); }
-  };
-  if (now) write(); else saveTimer = setTimeout(write, 300);
+    return;
+  }
+  // em segundo plano, para nao travar o navegador (no pendrive gravar pode demorar)
+  saveTimer = setTimeout(async () => {
+    saveTimer = null;
+    const tmp = file() + '.tmp-bg';
+    try {
+      await fs.promises.writeFile(tmp, JSON.stringify(data));
+      await fs.promises.rename(tmp, file());
+    } catch (err) { console.error('Falha ao salvar senhas', err); }
+  }, 300);
 }
 function flush() { if (saveTimer) save(true); }
 

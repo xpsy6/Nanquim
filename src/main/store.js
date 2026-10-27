@@ -5,11 +5,25 @@ const path = require('path');
 
 const DIR = () => app.getPath('userData');
 
+// Gravacao sem travar o navegador: o arquivo e escrito em segundo plano (assincrono), num arquivo
+// temporario que depois troca de nome com o original. Varios pedidos seguidos viram uma gravacao so.
+// Isso importa no pendrive, onde gravar alguns MB pode levar segundos.
+const slowLog = [];
+function noteSlow(file, ms, bytes) {
+  if (ms < 150) return;
+  slowLog.push({ t: Date.now(), file: path.basename(file), ms: Math.round(ms), kb: Math.round(bytes / 1024) });
+  if (slowLog.length > 50) slowLog.shift();
+}
+
 class JsonFile {
-  constructor(name, defaults) {
+  constructor(name, defaults, delay = 400) {
     this.file = path.join(DIR(), name + '.json');
     this.defaults = defaults;
+    this.delay = delay;
     this.timer = null;
+    this.writing = null;
+    this.dirty = false;
+    this.gen = 0;
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       if (Array.isArray(defaults)) this.data = Array.isArray(raw) ? raw : structuredClone(defaults);
@@ -18,22 +32,51 @@ class JsonFile {
       this.data = structuredClone(defaults);
     }
   }
-  save(now = false) {
+  // grava ja, sem esperar (usado ao fechar o navegador e em mudancas que nao podem se perder)
+  writeSync() {
     clearTimeout(this.timer);
-    const write = () => {
+    this.timer = null;
+    this.dirty = false;
+    this.gen++;
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      const tmp = this.file + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(this.data));
+      fs.renameSync(tmp, this.file);
+    } catch (err) {
+      console.error('Falha ao salvar', this.file, err);
+    }
+  }
+  async writeAsync() {
+    this.timer = null;
+    if (this.writing) { this.dirty = true; return; }
+    this.dirty = false;
+    const text = JSON.stringify(this.data);
+    const tmp = this.file + '.tmp-bg';
+    const gen = this.gen;
+    const t0 = Date.now();
+    this.writing = (async () => {
       try {
-        fs.mkdirSync(path.dirname(this.file), { recursive: true });
-        const tmp = this.file + '.tmp';
-        fs.writeFileSync(tmp, JSON.stringify(this.data));
-        fs.renameSync(tmp, this.file);
+        await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+        await fs.promises.writeFile(tmp, text);
+        // se nesse meio tempo houve uma gravacao imediata (mais nova), descarta esta
+        if (gen !== this.gen) { await fs.promises.unlink(tmp).catch(() => {}); return; }
+        await fs.promises.rename(tmp, this.file);
       } catch (err) {
         console.error('Falha ao salvar', this.file, err);
       }
-    };
-    if (now) write();
-    else this.timer = setTimeout(write, 400);
+    })();
+    await this.writing;
+    noteSlow(this.file, Date.now() - t0, text.length);
+    this.writing = null;
+    if (this.dirty) this.save();
   }
-  flush() { if (this.timer) this.save(true); }
+  save(now = false) {
+    if (now) return this.writeSync();
+    if (this.timer) return;
+    this.timer = setTimeout(() => this.writeAsync(), this.delay);
+  }
+  flush() { if (this.timer || this.dirty) this.writeSync(); }
 }
 
 const DEFAULT_PANELS = [
@@ -97,14 +140,14 @@ function init() {
   if (settings.data.accent === '#7d4dff') settings.data.accent = DEFAULT_SETTINGS.accent;
   if (!settings.data.enso) settings.data.enso = settings.data.accent;
   bookmarks = new JsonFile('bookmarks', []);
-  history = new JsonFile('history', []);
+  history = new JsonFile('history', [], 3000);
   downloads = new JsonFile('downloads', []);
-  session = new JsonFile('session', { windows: [] });
+  session = new JsonFile('session', { windows: [] }, 1500);
   permissions = new JsonFile('permissions', {});
   // senha para abrir: guarda so o resultado embaralhado (scrypt), nunca a senha
   lock = new JsonFile('lock', {});
   // icones dos sites ja visitados (por endereco), para as abas dormindo tambem mostrarem o icone
-  favicons = new JsonFile('favicons', {});
+  favicons = new JsonFile('favicons', {}, 8000);
 }
 
 function flushAll() {
@@ -117,6 +160,7 @@ module.exports = {
   DEFAULT_SETTINGS,
   get settings() { return settings; },
   get lock() { return lock; },
+  slowLog,
   get favicons() { return favicons; },
   get bookmarks() { return bookmarks; },
   get history() { return history; },

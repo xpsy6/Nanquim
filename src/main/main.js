@@ -109,6 +109,8 @@ const PORTABLE = (() => {
 })();
 
 if (PORTABLE) {
+  // no pendrive, um cache menor: menos gravacao, menos espera e menos desgaste
+  app.commandLine.appendSwitch('disk-cache-size', String(300 * 1024 * 1024));
   const sub = (name) => { const p = path.join(PORTABLE.data, name); try { fs.mkdirSync(p, { recursive: true }); } catch { /* ignorado */ } return p; };
   app.setPath('userData', PORTABLE.data);
   try { app.setPath('sessionData', PORTABLE.data); } catch { /* versoes antigas */ }
@@ -223,7 +225,7 @@ function internalHandler(request) {
 // tem icone guardado, ele e buscado por tras. A interface pede os icones por nanquim://favicon/,
 // com um codigo que muda a cada vez que o Nanquim abre, para os sites nao conseguirem espiar a lista.
 const FAV_TOKEN = require('crypto').randomBytes(9).toString('hex');
-const FAV_MAX = 300;
+const FAV_MAX = 200;
 const favMiss = new Map();
 const favQueue = new Map();
 let favRunning = 0;
@@ -268,7 +270,7 @@ function faviconResponse(p) {
 
 function storeIcon(key, dataUrl, from) {
   const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl || '');
-  if (!m || m[2].length > 90000) return false;
+  if (!m || m[2].length > 40000) return false;
   store.favicons.data[key] = { y: m[1], b: m[2], u: from || '', t: Date.now() };
   const all = Object.entries(store.favicons.data);
   if (all.length > FAV_MAX) {
@@ -335,7 +337,7 @@ function prepareSession(ses, isPrivate) {
   try { ses.protocol.handle('nanquim', internalHandler); } catch { /* ja registrado */ }
   adblock.attach(ses);
   // a pagina de login do Google e tudo que ela carrega usam a identidade do Electron
-  ses.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, cb) => {
+  ses.webRequest.onBeforeSendHeaders({ urls: ['https://*.google.com/*', 'https://*.gstatic.com/*', 'https://*.googleapis.com/*', 'https://*.googleusercontent.com/*', 'https://*.recaptcha.net/*'] }, (details, cb) => {
     const h = details.requestHeaders;
     let page = '';
     try { page = details.webContents && !details.webContents.isDestroyed() ? details.webContents.getURL() : ''; } catch { /* ignorado */ }
@@ -405,10 +407,15 @@ let dlList = [];
 let dlTimer = null;
 
 function dlPublic(d) {
+  // conferir se o arquivo ainda existe no maximo a cada 10 s (no pendrive cada consulta ao disco pesa)
+  if (d.state === 'completed' && (!d._seenAt || Date.now() - d._seenAt > 10000)) {
+    d._seen = fs.existsSync(d.savePath || '');
+    d._seenAt = Date.now();
+  }
   return {
     id: d.id, filename: d.filename, url: d.url, savePath: d.savePath, total: d.total,
     received: d.received, state: d.state, paused: d.paused, speed: d.speed, start: d.start,
-    exists: d.state === 'completed' ? fs.existsSync(d.savePath || '') : undefined
+    exists: d.state === 'completed' ? d._seen : undefined
   };
 }
 
@@ -2802,6 +2809,29 @@ function autoLockCheck() {
   try { if (powerMonitor.getSystemIdleTime() >= min * 60) lockNow(); } catch { /* ignorado */ }
 }
 
+// ---------- diagnostico de lentidao ----------
+// Se o navegador ficar parado mais de meio segundo, anota em logs\lentidao.txt quanto tempo ficou
+// e quais gravacoes de arquivo demoraram. Ajuda a descobrir o motivo de travadas (ex.: pendrive lento).
+function watchLag() {
+  let last = Date.now();
+  let busy = false;
+  setInterval(() => {
+    const now = Date.now();
+    const lag = now - last - 250;
+    last = now;
+    if (lag < 500 || busy) return;
+    busy = true;
+    const slow = store.slowLog.filter(x => now - x.t < 15000).map(x => `${x.file} ${x.ms}ms ${x.kb}KB`).join(', ');
+    const line = `${new Date(now).toLocaleString('pt-BR')}  travou ${lag}ms  memoria ${lastMetrics.ram}MB  abas ${allWindows().reduce((a, w) => a + w.nq.tabs.filter(t => t.view).length, 0)}${slow ? '  gravacoes lentas: ' + slow : ''}\n`;
+    const file = path.join(app.getPath('logs'), 'lentidao.txt');
+    fs.promises.mkdir(path.dirname(file), { recursive: true })
+      .then(() => fs.promises.stat(file).then(st => st.size > 200000 ? fs.promises.rename(file, file + '.antigo') : null).catch(() => null))
+      .then(() => fs.promises.appendFile(file, line))
+      .catch(() => {})
+      .finally(() => { busy = false; });
+  }, 250);
+}
+
 // ---------- ciclo de vida ----------
 
 function urlsFromArgv(argv) {
@@ -2861,6 +2891,7 @@ app.whenReady().then(async () => {
   setInterval(sampleMetrics, 3000);
   setInterval(housekeeping, 20000);
   setInterval(autoLockCheck, 15000);
+  watchLag();
   for (const ev of ['lock-screen', 'suspend']) {
     try { powerMonitor.on(ev, () => { if ((S().lockIdleMinutes || 0) > 0) lockNow(); }); } catch { /* ignorado */ }
   }
