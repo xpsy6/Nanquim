@@ -87,6 +87,51 @@ app.commandLine.appendSwitch('lang', 'pt-BR');
 app.setName('Nanquim');
 if (process.platform === 'win32') app.setAppUserModelId('com.felipemisso.nanquim');
 
+// ---------- modo portatil (pendrive) ----------
+// Se existir uma pasta "Dados" ao lado do Nanquim.exe, tudo do navegador fica nela: perfil, cookies,
+// cache, senhas, arquivos temporarios, registros e as atualizacoes baixadas. Nada vai para o disco C.
+// Tambem reconhece o jeito antigo: Programa\Nanquim\Nanquim.exe com os dados em Dados\Nanquim,
+// uma ou duas pastas acima. Se o Nanquim for aberto com --user-data-dir, essa escolha vale.
+const PORTABLE = (() => {
+  if (process.argv.some(a => /^--user-data-dir(=|$)/.test(a))) return null;
+  const exeDir = !app.isPackaged && process.env.NANQUIM_TESTE_EXE_DIR ? process.env.NANQUIM_TESTE_EXE_DIR : path.dirname(process.execPath);
+  const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+  const found = [
+    { dados: path.join(exeDir, 'Dados'), ok: (d) => isDir(d) },
+    { dados: path.join(exeDir, '..', 'Dados'), ok: (d) => isDir(path.join(d, 'Nanquim')) },
+    { dados: path.join(exeDir, '..', '..', 'Dados'), ok: (d) => isDir(path.join(d, 'Nanquim')) }
+  ].find(c => c.ok(c.dados));
+  if (!found) return null;
+  const dados = path.resolve(found.dados);
+  // dados ja existentes em Dados\Nanquim continuam onde estao; numa pasta Dados nova, usa ela direto
+  const data = isDir(path.join(dados, 'Nanquim')) ? path.join(dados, 'Nanquim') : dados;
+  return { exeDir: path.resolve(exeDir), dados, data, root: path.dirname(dados) };
+})();
+
+if (PORTABLE) {
+  const sub = (name) => { const p = path.join(PORTABLE.data, name); try { fs.mkdirSync(p, { recursive: true }); } catch { /* ignorado */ } return p; };
+  app.setPath('userData', PORTABLE.data);
+  try { app.setPath('sessionData', PORTABLE.data); } catch { /* versoes antigas */ }
+  try { app.setPath('crashDumps', sub('Crashpad')); } catch { /* ignorado */ }
+  try { app.setAppLogsPath(sub('logs')); } catch { /* ignorado */ }
+  // arquivos temporarios do navegador e do instalador das atualizacoes
+  const tmp = sub('Temp');
+  process.env.TEMP = tmp;
+  process.env.TMP = tmp;
+  try { app.setPath('temp', tmp); } catch { /* ignorado */ }
+  // downloads vao para a pasta Downloads do pendrive (da para trocar em Configuracoes, Downloads)
+  const dl = path.join(PORTABLE.root, 'Downloads');
+  try { fs.mkdirSync(dl, { recursive: true }); app.setPath('downloads', dl); } catch { /* ignorado */ }
+  // limpa temporarios com mais de 2 dias
+  try {
+    const old = Date.now() - 2 * 86400000;
+    for (const f of fs.readdirSync(tmp)) {
+      const p = path.join(tmp, f);
+      try { if (fs.statSync(p).mtimeMs < old) fs.rmSync(p, { recursive: true, force: true }); } catch { /* em uso */ }
+    }
+  } catch { /* ignorado */ }
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 
@@ -1903,7 +1948,7 @@ async function ensurePanelIcons() {
 // (ou na hora, se a pessoa clicar em "Reiniciar"). As versoes ficam nos Releases do GitHub.
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* sem atualizador no modo de desenvolvimento */ }
-const updateState = { status: 'idle', version: null, progress: 0, error: null, checkedAt: null };
+const updateState = { status: 'idle', version: null, progress: 0, error: null, checkedAt: null, manual: false };
 
 function pushUpdate() {
   for (const w of allWindows()) w.webContents.send('update', updateState);
@@ -1930,6 +1975,16 @@ function setupUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = false;
+  updateState.manual = !!PORTABLE;
+  if (PORTABLE) {
+    // portatil: nao instala sozinho ao fechar, baixa a atualizacao para dentro da pasta de dados
+    // e instala na mesma pasta onde esta o Nanquim.exe
+    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.installDirectory = PORTABLE.exeDir;
+    const cache = path.join(PORTABLE.data, 'Atualizacoes');
+    try { fs.mkdirSync(cache, { recursive: true }); } catch { /* ignorado */ }
+    try { Object.defineProperty(autoUpdater.app, 'baseCachePath', { get: () => cache, configurable: true }); } catch { /* ignorado */ }
+  }
   autoUpdater.on('checking-for-update', () => { updateState.status = 'checking'; pushUpdate(); });
   autoUpdater.on('update-available', (info) => { updateState.status = 'downloading'; updateState.version = info.version; updateState.progress = 0; pushUpdate(); });
   autoUpdater.on('update-not-available', () => { updateState.status = 'latest'; updateState.checkedAt = Date.now(); pushUpdate(); });
@@ -2312,6 +2367,7 @@ const internalApi = {
   info: () => ({
     version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome,
     node: process.versions.node, platform: process.platform, userData: app.getPath('userData'),
+    portable: PORTABLE ? { exeDir: PORTABLE.exeDir, data: PORTABLE.data } : null,
     downloads: S().downloadDir || app.getPath('downloads'),
     blocklist: adblock.size, blockedTotal: adblock.total,
     isDefault: app.isDefaultProtocolClient('https')

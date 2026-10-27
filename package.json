@@ -1,6 +1,6 @@
 {
   "name": "nanquim",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Navegador Nanquim: rápido, com bloqueador, painéis laterais e visual de nanquim.",
   "main": "src/main/main.js",
   "scripts": {

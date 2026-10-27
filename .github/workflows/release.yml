@@ -75,6 +75,11 @@ jobs:
         if: steps.v.outputs.exists == 'false'
         run: node build/make-latest.js
 
+      - name: Montar a versão portátil (zip para pendrive)
+        if: steps.v.outputs.exists == 'false'
+        shell: pwsh
+        run: Compress-Archive -Path dist/win-unpacked/* -DestinationPath "dist/Nanquim-${{ steps.v.outputs.version }}-portatil.zip"
+
       - name: Publicar em Releases
         if: steps.v.outputs.exists == 'false'
         shell: bash
@@ -84,5 +89,5 @@ jobs:
         run: |
           NOTES="build/notas/$VERSION.md"
           if [ ! -f "$NOTES" ]; then echo "Nanquim $VERSION" > notas.md; NOTES=notas.md; fi
-          gh release create "v$VERSION" "dist/Nanquim-Setup-$VERSION.exe" dist/latest.yml \
+          gh release create "v$VERSION" "dist/Nanquim-Setup-$VERSION.exe" dist/latest.yml "dist/Nanquim-$VERSION-portatil.zip" \
             --repo "$GITHUB_REPOSITORY" --title "Nanquim $VERSION" --notes-file "$NOTES" --target "$GITHUB_SHA"

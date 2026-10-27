@@ -27,6 +27,7 @@ VIAddVersionKey "LegalCopyright" "Felipe Misso"
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
 !define MUI_ICON "icon.ico"
 !define MUI_UNICON "icon.ico"
 !define MUI_ABORTWARNING
@@ -43,14 +44,35 @@ VIAddVersionKey "LegalCopyright" "Felipe Misso"
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "PortugueseBR"
 
+; modo portatil: pasta "Dados" ao lado do Nanquim.exe, ou Dados\Nanquim uma ou duas pastas acima
+Var Portable
+Function DetectPortable
+  StrCpy $Portable "0"
+  ${If} ${FileExists} "$INSTDIR\Dados\*.*"
+    StrCpy $Portable "1"
+  ${ElseIf} ${FileExists} "$INSTDIR\..\Dados\Nanquim\*.*"
+    StrCpy $Portable "1"
+  ${ElseIf} ${FileExists} "$INSTDIR\..\..\Dados\Nanquim\*.*"
+    StrCpy $Portable "1"
+  ${EndIf}
+FunctionEnd
+
 Section "Nanquim" SecMain
   SectionIn RO
   ; fecha o navegador se estiver aberto
   nsExec::Exec 'taskkill /f /im ${EXE}'
   Sleep 600
 
+  Call DetectPortable
   SetOutPath "$INSTDIR"
   File /r "..\dist\win-unpacked\*.*"
+
+  ; no modo portatil (pendrive) so os arquivos do programa sao trocados:
+  ; sem atalhos, sem registro do Windows e sem desinstalador, nada fora da pasta
+  ${If} $Portable == "1"
+    Goto done
+  ${EndIf}
+
   WriteUninstaller "$INSTDIR\Desinstalar Nanquim.exe"
   WriteRegStr HKCU "Software\Nanquim" "InstallDir" "$INSTDIR"
 
@@ -86,6 +108,7 @@ Section "Nanquim" SecMain
   WriteRegStr HKCU "${CLIENT_KEY}\Capabilities\FileAssociations" ".htm" "NanquimURL"
   WriteRegStr HKCU "${CLIENT_KEY}\Capabilities\StartMenu" "StartMenuInternet" "Nanquim"
   WriteRegStr HKCU "Software\RegisteredApplications" "Nanquim" "${CLIENT_KEY}\Capabilities"
+  done:
 SectionEnd
 
 ; depois de uma atualizacao automatica (instalacao silenciosa), abre o Nanquim de novo
@@ -103,7 +126,11 @@ Section "Uninstall"
   Sleep 600
   Delete "$DESKTOP\Nanquim.lnk"
   Delete "$SMPROGRAMS\Nanquim.lnk"
-  RMDir /r "$INSTDIR"
+  ; apaga so os arquivos do programa; uma pasta Dados ao lado do Nanquim.exe fica intacta
+  Delete "$INSTDIR\*.*"
+  RMDir /r "$INSTDIR\locales"
+  RMDir /r "$INSTDIR\resources"
+  RMDir "$INSTDIR"
   DeleteRegKey HKCU "${UNINST_KEY}"
   DeleteRegKey HKCU "Software\Nanquim"
   DeleteRegKey HKCU "Software\Classes\NanquimURL"

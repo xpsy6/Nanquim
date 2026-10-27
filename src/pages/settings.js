@@ -196,7 +196,7 @@ $('#ext-add').addEventListener('click', async () => {
 async function refreshInfo() {
   const i = await NQ.api('info');
   $('#ab-info').textContent = `${i.blocklist.toLocaleString('pt-BR')} domínios na lista · ${i.blockedTotal.toLocaleString('pt-BR')} bloqueados desde que você abriu`;
-  $('#data-dir').textContent = i.userData;
+  $('#data-dir').textContent = i.portable ? `Modo portátil: ${i.userData} (programa em ${i.portable.exeDir})` : i.userData;
   $('#default-info').textContent = i.isDefault ? 'O Nanquim já é o navegador padrão.' : 'Abre os links de outros programas no Nanquim.';
   $('#about').textContent = `Nanquim ${i.version} · motor Chromium ${i.chrome}`;
   if (!S || !S.downloadDir) $('#dl-dir').textContent = i.downloads;
@@ -228,7 +228,9 @@ function renderUpdate(u) {
     case 'checking': info.textContent = v + 'Procurando versão nova...'; btn.disabled = true; break;
     case 'downloading': info.textContent = v + `Baixando a versão ${u.version} (${u.progress}%). Pode continuar navegando.`; btn.disabled = true; break;
     case 'ready':
-      info.textContent = v + `A versão ${u.version} está pronta. Ela entra quando você fechar o navegador, ou agora:`;
+      info.textContent = v + (u.manual
+        ? `A versão ${u.version} já foi baixada para o pendrive. No modo portátil ela só entra quando você mandar:`
+        : `A versão ${u.version} está pronta. Ela entra quando você fechar o navegador, ou agora:`);
       btn.textContent = 'Reiniciar e atualizar';
       btn.onclick = () => NQ.api('installUpdate');
       break;

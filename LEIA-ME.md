@@ -12,6 +12,17 @@ Depois dessa instalação, o Nanquim se atualiza sozinho: procura versão nova a
 
 O instalador cria atalhos na Área de Trabalho e no menu Iniciar e coloca o Nanquim na lista de navegadores do Windows. Para desinstalar, vá em Configurações do Windows, Aplicativos, Nanquim. Seus dados (favoritos, histórico, logins) ficam em `%APPDATA%\Nanquim`.
 
+## Modo portátil (pendrive)
+
+O Nanquim roda direto do pendrive sem gravar nada no disco C quando encontra uma pasta `Dados`:
+
+- `Dados` ao lado do `Nanquim.exe`: tudo fica nessa pasta.
+- Ou o formato `Nanquim\Programa\Nanquim\Nanquim.exe` com os dados em `Nanquim\Dados\Nanquim`.
+
+No modo portátil, perfil, cookies, cache, senhas, arquivos temporários, registros e as atualizações baixadas ficam na pasta de dados. Os downloads vão para a pasta `Downloads` do pendrive. A atualização não instala sozinha ao fechar: aparece o botão "Atualizar", e ao clicar ela instala na mesma pasta do `Nanquim.exe`, sem atalhos e sem registro no Windows. Cada versão também sai em Releases como `Nanquim-x.x.x-portatil.zip`, para montar um pendrive novo.
+
+Os logins dos sites e as senhas salvas são protegidos pela conta do Windows do computador onde foram salvos. Em outro computador o Nanquim abre com tudo, mas pede para entrar nos sites de novo, e as senhas salvas não abrem lá.
+
 ## O que ele faz
 
 - Abas com arrastar para reordenar, fixar, silenciar, duplicar, reabrir fechada (Ctrl+Shift+T) e suspender
