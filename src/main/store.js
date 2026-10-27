@@ -70,6 +70,8 @@ const DEFAULT_SETTINGS = {
   sleepMinutes: 30,
   ramLimitMB: 0,
   lockIdleMinutes: 0,
+  savePasswords: true,
+  fillPasswords: true,
   askDownload: false,
   downloadDir: '',
   newtabClock: true,

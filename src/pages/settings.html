@@ -15,6 +15,7 @@
       <a href="#inicio">Ao abrir</a>
       <a href="#pesquisa">Pesquisa</a>
       <a href="#privacidade">Privacidade</a>
+      <a href="#senhas">Senhas</a>
       <a href="#desempenho">Desempenho</a>
       <a href="#downloads">Downloads</a>
       <a href="#paineis">Painéis laterais</a>
@@ -147,6 +148,36 @@
         <div class="card">
           <div class="label">Permissões que você já respondeu</div>
           <div id="perms"></div>
+        </div>
+      </section>
+
+      <section id="senhas">
+        <h2>Senhas</h2>
+        <div class="card">
+          <div class="opt"><div><b>Oferecer para salvar senhas</b><small>Quando você entra num site, o Nanquim pergunta se quer guardar o e-mail e a senha.</small></div><button class="switch" data-bool="savePasswords"></button></div>
+          <div class="opt"><div><b>Sugerir logins salvos</b><small>Ao clicar no campo de login, aparecem as contas salvas daquele site. Um clique preenche tudo.</small></div><button class="switch" data-bool="fillPasswords"></button></div>
+          <p class="note pw-note" id="pw-note">As senhas ficam criptografadas pela proteção do Windows: só a sua conta, neste computador, consegue abrir.</p>
+        </div>
+        <div class="card">
+          <div class="pw-head">
+            <div class="label" id="pw-count">Senhas salvas</div>
+            <input class="field pw-search" id="pw-q" placeholder="Procurar site ou e-mail" spellcheck="false">
+          </div>
+          <form class="pw-auth" id="pw-auth" hidden autocomplete="off">
+            <span>Digite a senha do Nanquim para ver as senhas</span>
+            <input class="field" type="password" id="pw-auth-in" autocomplete="off">
+            <button class="btn primary" type="submit">Liberar</button>
+            <small id="pw-auth-err"></small>
+          </form>
+          <div id="pw-list" class="pw-list"></div>
+          <div class="inline pw-import">
+            <button class="btn" id="pw-import">Importar senhas do Chrome</button>
+            <small>No Chrome: Configurações, Senhas, Exportar senhas. Depois de importar, apague o arquivo .csv, porque ele guarda as senhas sem proteção.</small>
+          </div>
+        </div>
+        <div class="card" id="pw-never-card" hidden>
+          <div class="label">Sites que nunca salvam</div>
+          <div id="pw-never" class="chips"></div>
         </div>
       </section>
 

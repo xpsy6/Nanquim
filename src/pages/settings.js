@@ -305,3 +305,102 @@ $('#lock-form').addEventListener('submit', async (e) => {
 });
 
 renderLock();
+
+// ---------- senhas salvas ----------
+const PWS = { shown: new Map(), after: null, timer: null };
+
+async function renderPasswords() {
+  const info = await NQ.api('pwInfo');
+  const q = $('#pw-q').value;
+  const list = await NQ.api('pwList', q);
+  $('#pw-count').textContent = info.count ? `${info.count} ${info.count === 1 ? 'senha salva' : 'senhas salvas'}` : 'Senhas salvas';
+  if (!info.available) $('#pw-note').textContent = 'A proteção do Windows não está disponível agora, então o Nanquim não salva senhas novas.';
+  else if (info.lock) $('#pw-note').textContent = 'As senhas ficam criptografadas pela proteção do Windows, e para ver ou copiar uma senha aqui o Nanquim pede a senha dele.';
+  else $('#pw-note').textContent = 'As senhas ficam criptografadas pela proteção do Windows. Dica: com a senha para abrir o Nanquim ligada (em Privacidade), ver ou copiar uma senha aqui também pede essa senha.';
+  const box = $('#pw-list');
+  if (!list.length) {
+    box.innerHTML = `<div class="pw-empty">${q ? 'Nada encontrado.' : 'Nenhuma senha salva ainda. Entre em algum site e o Nanquim vai perguntar se quer salvar.'}</div>`;
+  } else {
+    box.innerHTML = list.map(it => {
+      const shown = PWS.shown.has(it.id);
+      return `<div class="pw-row" data-id="${esc(it.id)}">
+        ${favImg(it.site, it.host)}
+        <span class="site" title="${esc(it.host)}">${esc(it.host)}</span>
+        <span class="user" title="${esc(it.username)}">${esc(it.username || '(sem usuário)')}</span>
+        <span class="pass${shown ? ' shown' : ''}">${shown ? esc(PWS.shown.get(it.id)) : '••••••••••'}</span>
+        <span class="acts">
+          <button class="icon-btn" data-eye title="${shown ? 'Esconder' : 'Mostrar a senha'}">${icon(shown ? 'eyeOff' : 'eye')}</button>
+          <button class="icon-btn" data-copy title="Copiar a senha">${icon('copy')}</button>
+          <button class="icon-btn danger" data-del title="Apagar">${icon('trash')}</button>
+        </span>
+      </div>`;
+    }).join('');
+    hydrateFavs(box);
+  }
+  const nv = await NQ.api('pwNever');
+  $('#pw-never-card').hidden = !nv.length;
+  $('#pw-never').innerHTML = nv.map(n => `<span class="chip">${esc(n.host)}<button class="icon-btn" data-un="${esc(n.site)}" title="Voltar a oferecer">${icon('close')}</button></span>`).join('');
+}
+
+// ver ou copiar: com a senha do Nanquim ligada, pede ela uma vez (fica liberado por 5 minutos)
+async function pwAction(id, copy, current) {
+  const r = await NQ.api('pwReveal', { id, copy, current });
+  if (r.ok) {
+    $('#pw-auth').hidden = true;
+    if (copy) toast('Senha copiada. Ela sai da área de transferência em 45 segundos.');
+    else { PWS.shown.set(id, r.password); renderPasswords(); }
+    return true;
+  }
+  if (r.needAuth) {
+    PWS.after = { id, copy };
+    const f = $('#pw-auth');
+    f.hidden = false;
+    $('#pw-auth-err').textContent = current !== undefined ? r.error : '';
+    $('#pw-auth-in').value = '';
+    $('#pw-auth-in').focus();
+    return false;
+  }
+  toast(r.error || 'Não deu certo.');
+  return false;
+}
+
+$('#pw-auth').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (PWS.after) pwAction(PWS.after.id, PWS.after.copy, $('#pw-auth-in').value);
+});
+
+$('#pw-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  const row = e.target.closest('.pw-row');
+  if (!b || !row) return;
+  const id = row.dataset.id;
+  if (b.hasAttribute('data-eye')) {
+    if (PWS.shown.has(id)) { PWS.shown.delete(id); renderPasswords(); } else pwAction(id, false);
+  } else if (b.hasAttribute('data-copy')) pwAction(id, true);
+  else if (b.hasAttribute('data-del')) {
+    // apagar pede dois cliques
+    if (b.dataset.armed) { await NQ.api('pwDelete', id); PWS.shown.delete(id); toast('Senha apagada'); renderPasswords(); return; }
+    b.dataset.armed = '1';
+    b.classList.add('armed');
+    b.title = 'Clique de novo para apagar';
+    toast('Clique de novo na lixeira para apagar');
+    setTimeout(() => { delete b.dataset.armed; b.classList.remove('armed'); b.title = 'Apagar'; }, 3000);
+  }
+});
+
+$('#pw-never').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-un]');
+  if (b) { await NQ.api('pwUnNever', b.dataset.un); renderPasswords(); }
+});
+
+$('#pw-q').addEventListener('input', () => { clearTimeout(PWS.timer); PWS.timer = setTimeout(renderPasswords, 120); });
+
+$('#pw-import').addEventListener('click', async () => {
+  const r = await NQ.api('pwImport');
+  if (r.canceled) return;
+  if (!r.ok) { toast(r.error || 'Não deu para importar.'); return; }
+  toast(`Importadas: ${r.added} novas${r.updated ? `, ${r.updated} atualizadas` : ''}. Agora apague o arquivo .csv.`);
+  renderPasswords();
+});
+
+renderPasswords();

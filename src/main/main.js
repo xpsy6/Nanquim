@@ -22,6 +22,7 @@ const HOST_BRAND = {
 const DARK_BRANDS = ['github', 'x', 'notion', 'vercel', 'chatgpt'];
 function panelIconOf(p) { return (PANEL_BRAND[p.id] && BRAND[PANEL_BRAND[p.id]]) || p.icon || null; }
 const adblock = require('./adblock');
+const passwords = require('./passwords');
 
 const ROOT = path.join(__dirname, '..');
 const PRELOAD_UI = path.join(ROOT, 'preload', 'ui.js');
@@ -30,6 +31,8 @@ const PRELOAD_GRIP = path.join(ROOT, 'preload', 'grip.js');
 const GRIP_HTML = path.join(ROOT, 'ui', 'grip.html');
 const PRELOAD_COVER = path.join(ROOT, 'preload', 'cover.js');
 const COVER_HTML = path.join(ROOT, 'ui', 'cover.html');
+const PRELOAD_PWB = path.join(ROOT, 'preload', 'pwbubble.js');
+const PWB_HTML = path.join(ROOT, 'ui', 'pwbubble.html');
 const GRIP_W = 16;
 const PANEL_MIN = 300;
 const PAGES_DIR = path.join(ROOT, 'pages');
@@ -563,6 +566,7 @@ function broadcastSettings() {
   for (const w of allWindows()) {
     if (w.nq.grip && !w.nq.grip.webContents.isDestroyed()) w.nq.grip.webContents.send('grip:accent', S().accent);
     if (w.nq.cover && !w.nq.cover.webContents.isDestroyed()) { w.nq.cover.setBackgroundColor(t.cover); pushCover(w); }
+    if (w.nq.pwPrompt) pushPwPrompt(w);
     if (process.platform !== 'darwin') {
       try { w.setTitleBarOverlay({ color: t.bar, symbolColor: t.fg, height: 46 }); } catch { /* ignorado */ }
     }
@@ -649,6 +653,7 @@ function activateTab(win, id) {
     if (nq.findOpen) closeFind(win);
     if (prev.view) { try { win.contentView.removeChildView(prev.view); } catch { /* ja removida */ } }
   }
+  if (nq.pwPrompt && nq.pwPrompt.tabId !== id) closePwPrompt(win);
   nq.activeId = id;
   tab.lastActive = Date.now();
   if (!tab.view) {
@@ -760,6 +765,7 @@ function setZoom(tab, dir) {
 function wireTab(win, tab) {
   const wc = tab.view.webContents;
   watchUserAgent(wc);
+  watchLoginNav(win, wc);
   const update = () => sendState(win);
 
   wc.on('did-start-loading', () => { tab.loading = true; update(); });
@@ -1121,10 +1127,13 @@ function togglePanel(win, id) {
 function stackPanel(win) {
   const nq = win.nq;
   const v = nq.panelOpen && nq.panelViews.get(nq.panelOpen);
-  if (!v) return;
-  win.contentView.addChildView(v);
-  if (nq.cover && !nq.cover.webContents.isDestroyed()) win.contentView.addChildView(nq.cover);
-  if (nq.grip && !nq.grip.webContents.isDestroyed()) win.contentView.addChildView(nq.grip);
+  if (v) {
+    win.contentView.addChildView(v);
+    if (nq.cover && !nq.cover.webContents.isDestroyed()) win.contentView.addChildView(nq.cover);
+    if (nq.grip && !nq.grip.webContents.isDestroyed()) win.contentView.addChildView(nq.grip);
+  }
+  // o balao de salvar senha fica por cima de tudo
+  if (nq.pwb && !nq.pwb.webContents.isDestroyed() && nq.pwPrompt) win.contentView.addChildView(nq.pwb);
 }
 
 // ---------- carregamento do painel: capa, erros e recuperacao ----------
@@ -1178,6 +1187,7 @@ function restartPanel(win, id, how = 'reload') {
 
 function wirePanel(win, id, view) {
   const wc = view.webContents;
+  watchLoginNav(win, wc);
   const st = () => win.nq.panelState.get(id);
   const log = (m) => { const s = st(); if (s) plog(s, m); };
   wc.on('did-start-navigation', (e) => {
@@ -1472,6 +1482,7 @@ function applyLayout(win) {
     }
     tab.view.setVisible(!nq.frozen);
   }
+  layoutPwBubble(win, W);
   if (nq.panelOpen) {
     const view = nq.panelViews.get(nq.panelOpen);
     const i = nq.insets && nq.insets.view;
@@ -1711,6 +1722,7 @@ function createWindow(opts = {}) {
     for (const v of win.nq.panelViews.values()) { try { v.webContents.close(); } catch { /* ignorado */ } }
     if (win.nq.grip) { try { win.nq.grip.webContents.close(); } catch { /* ignorado */ } }
     if (win.nq.cover) { try { win.nq.cover.webContents.close(); } catch { /* ignorado */ } }
+    if (win.nq.pwb) { try { win.nq.pwb.webContents.close(); } catch { /* ignorado */ } }
     windows.delete(win);
     if (!sessionLocked) scheduleSessionSave();
   });
@@ -1794,6 +1806,7 @@ async function snapStart(win) {
   if (pv) pv.setVisible(false);
   if (nq.grip) nq.grip.setVisible(false);
   if (nq.cover) nq.cover.setVisible(false);
+  if (nq.pwb) nq.pwb.setVisible(false);
   return data ? { data, rect, title: tab.title, url: displayUrl(tab.url) } : null;
 }
 
@@ -2090,6 +2103,7 @@ ipcMain.handle('ui:invoke', async (e, action, ...args) => {
         if (pv) { nq.panelHidden = true; pv.setVisible(false); }
         if (nq.grip) nq.grip.setVisible(false);
         if (nq.cover) nq.cover.setVisible(false);
+        if (nq.pwb) nq.pwb.setVisible(false);
       }
       return { page: data, panel };
     }
@@ -2328,6 +2342,35 @@ const internalApi = {
     return { ok: true };
   },
   lockNow: () => lockNow(),
+  // senhas salvas
+  pwInfo: () => ({ count: passwords.count(), available: passwords.available(), lock: lockEnabled(), authed: !lockEnabled() || Date.now() < pwAuthUntil }),
+  pwList: (q) => passwords.all(q),
+  pwReveal: async ({ id, current, copy } = {}) => {
+    if (lockEnabled() && Date.now() >= pwAuthUntil) {
+      // so pede a senha; nao conta como tentativa errada enquanto nada foi digitado
+      if (current == null) return { ok: false, needAuth: true };
+      const v = await verifyPassword(current);
+      if (!v.ok) return { ok: false, needAuth: true, error: v.waitMs ? 'Muitas tentativas erradas. Espere um pouco.' : 'Senha do Nanquim errada.' };
+      pwAuthUntil = Date.now() + 5 * 60000;
+    }
+    const pw = passwords.reveal(String(id || ''));
+    if (pw == null) return { ok: false, error: 'Não deu para abrir essa senha.' };
+    if (copy) {
+      copyText(pw);
+      // apaga da area de transferencia depois de 45 s, se ainda for a mesma senha
+      setTimeout(async () => { try { if (await clipboard.readText() === pw) copyText(''); } catch { /* ignorado */ } }, 45000);
+      return { ok: true };
+    }
+    return { ok: true, password: pw };
+  },
+  pwDelete: (id) => passwords.remove(String(id || '')),
+  pwNever: () => passwords.neverList(),
+  pwUnNever: (site) => { passwords.unNever(String(site || '')); return true; },
+  pwImport: async (e, win) => {
+    const r = await dialog.showOpenDialog(win, { title: 'Importar senhas do Chrome', filters: [{ name: 'Senhas exportadas (CSV)', extensions: ['csv'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+    try { return passwords.importCsv(fs.readFileSync(r.filePaths[0], 'utf8')); } catch { return { ok: false, error: 'Não deu para ler o arquivo.' }; }
+  },
   openFolder: (which) => shell.openPath(which === 'data' ? app.getPath('userData') : (S().downloadDir || app.getPath('downloads')))
 };
 
@@ -2336,7 +2379,7 @@ ipcMain.handle('nq:api', async (e, method, arg) => {
   const fn = internalApi[method];
   if (!fn) throw new Error('metodo desconhecido: ' + method);
   const win = BrowserWindow.fromWebContents(e.sender) || findTabByWc(e.sender.id)?.win || focusedWindow();
-  if (['importBookmarks', 'exportBookmarks', 'chooseDownloadDir', 'addExtension'].includes(method)) return fn(e, win);
+  if (['importBookmarks', 'exportBookmarks', 'chooseDownloadDir', 'addExtension', 'pwImport'].includes(method)) return fn(e, win);
   return fn(arg);
 });
 
@@ -2382,6 +2425,168 @@ function housekeeping() {
   }
 }
 
+// ---------- senhas dos sites: salvar e preencher ----------
+// A pagina (pelo preload, num mundo isolado) avisa quando um login e enviado. O Nanquim guarda o login
+// "pendente" e so pergunta se quer salvar quando o login parece ter dado certo: a pagina mudou e nao
+// tem mais campo de senha, ou o campo de senha sumiu. A pergunta aparece num balao por cima da pagina.
+
+const pwPending = new Map(); // id do webContents -> { key, host, username, password, action, t }
+const pwLastUser = new Map(); // site -> { u, t } (e-mail digitado na 1a etapa de logins em duas telas)
+
+// quem mandou a mensagem: uma aba ou painel de site comum (nunca a interface ou paginas nanquim://)
+function pwSender(e) {
+  let url = '';
+  try { url = (e.senderFrame && e.senderFrame.url) || e.sender.getURL(); } catch { return null; }
+  const key = passwords.siteKey(url);
+  if (!key) return null;
+  const found = findTabByWc(e.sender.id);
+  if (found) return { win: found.win, tab: found.tab, key, url, isPrivate: found.win.nq.isPrivate };
+  for (const win of allWindows()) {
+    for (const [pid, v] of win.nq.panelViews) {
+      if (!v.webContents.isDestroyed() && v.webContents.id === e.sender.id) return { win, panelId: pid, key, url, isPrivate: false };
+    }
+  }
+  return null;
+}
+
+ipcMain.on('pw:submit', (e, payload) => {
+  const s = pwSender(e);
+  if (!s || s.isPrivate || !S().savePasswords || !passwords.available()) return;
+  const password = String(payload && payload.password || '');
+  let username = String(payload && payload.username || '').trim().slice(0, 200);
+  if (!password || password.length > 500) return;
+  if (!username) {
+    const last = pwLastUser.get(s.key);
+    if (last && Date.now() - last.t < 10 * 60000) username = last.u;
+  }
+  const action = passwords.decide(s.key, username, password);
+  if (!action) { pwPending.delete(e.sender.id); return; }
+  pwPending.set(e.sender.id, { key: s.key, host: s.key.replace(/^https?:\/\//, ''), username, password, action, t: Date.now(), tabId: s.tab ? s.tab.id : null, win: s.win });
+});
+
+ipcMain.on('pw:gone', (e) => maybeAskPassword(e.sender, false));
+
+ipcMain.on('pw:user', (e, value) => {
+  const s = pwSender(e);
+  if (!s || s.isPrivate) return;
+  const u = String(value || '').trim().slice(0, 200);
+  if (u) pwLastUser.set(s.key, { u, t: Date.now() });
+});
+
+ipcMain.handle('pw:suggest', (e, opts = {}) => {
+  const s = pwSender(e);
+  if (!s || !S().fillPasswords) return null;
+  const base = { theme: S().theme, accent: S().accent, host: s.key.replace(/^https?:\/\//, '') };
+  const logins = passwords.forSite(s.key).map(x => ({ id: x.id, username: x.username }));
+  if (logins.length) return { ...base, kind: 'login', items: logins };
+  if (opts.email && !opts.password) return { ...base, kind: 'email', items: passwords.emails().map(u => ({ username: u })) };
+  return null;
+});
+
+ipcMain.handle('pw:fill', (e, id) => {
+  const s = pwSender(e);
+  if (!s || !S().fillPasswords) return null;
+  return passwords.fill(String(id || ''), s.key);
+});
+
+ipcMain.on('pw:manage', (e) => {
+  const s = pwSender(e);
+  if (s) openInternal(s.win, 'settings', 'senhas');
+});
+
+// depois que a pagina navega, confere se o login deu certo (nao tem mais campo de senha a vista)
+function watchLoginNav(win, wc) {
+  const after = () => {
+    if (!pwPending.has(wc.id)) return;
+    setTimeout(() => maybeAskPassword(wc, true), 1400);
+  };
+  wc.on('did-navigate', after);
+  wc.on('did-navigate-in-page', (ev, url, isMainFrame) => { if (isMainFrame) after(); });
+  wc.on('destroyed', () => pwPending.delete(wc.id));
+}
+
+async function maybeAskPassword(wc, checkForm) {
+  if (!wc || wc.isDestroyed()) return;
+  const p = pwPending.get(wc.id);
+  if (!p || Date.now() - p.t > 90000) { pwPending.delete(wc.id); return; }
+  if (checkForm) {
+    const still = await withTimeout(wc.executeJavaScriptInIsolatedWorld(1998, [{ code: `[...document.querySelectorAll('input[type=password]')].some(i => { const r = i.getBoundingClientRect(); return r.width > 2 && r.height > 2; })` }]), 1500);
+    // a pagina voltou com campo de senha: provavelmente a senha estava errada, nao pergunta
+    if (still === true) return;
+  }
+  pwPending.delete(wc.id);
+  const win = p.win;
+  if (!win || win.isDestroyed()) return;
+  // so pergunta se a aba do login ainda e a que esta na tela (ou se veio de um painel)
+  if (p.tabId && win.nq.activeId !== p.tabId) return;
+  win.nq.pwPrompt = { ...p, win: undefined };
+  ensurePwBubble(win);
+  pushPwPrompt(win);
+  stackPanel(win);
+  if (win.nq.pwb && !win.nq.pwb.webContents.isDestroyed()) win.contentView.addChildView(win.nq.pwb);
+  applyLayout(win);
+}
+
+function ensurePwBubble(win) {
+  const nq = win.nq;
+  if (nq.pwb && !nq.pwb.webContents.isDestroyed()) return nq.pwb;
+  const v = new WebContentsView({ webPreferences: { preload: PRELOAD_PWB, contextIsolation: true, sandbox: true, spellcheck: false } });
+  v.setBackgroundColor('#00000000');
+  try { v.setBorderRadius(14); } catch { /* versoes antigas */ }
+  v.setVisible(false);
+  v.webContents.loadFile(PWB_HTML);
+  v.webContents.on('did-finish-load', () => pushPwPrompt(win));
+  nq.pwb = v;
+  nq.pwbH = 252;
+  win.contentView.addChildView(v);
+  return v;
+}
+
+function pushPwPrompt(win) {
+  const nq = win.nq;
+  if (!nq.pwb || nq.pwb.webContents.isDestroyed() || !nq.pwPrompt) return;
+  const p = nq.pwPrompt;
+  nq.pwb.webContents.send('pwb:data', { theme: S().theme, accent: S().accent, host: p.host, username: p.username, password: p.password, action: p.action });
+}
+
+function closePwPrompt(win) {
+  const nq = win.nq;
+  nq.pwPrompt = null;
+  if (nq.pwb && !nq.pwb.webContents.isDestroyed()) nq.pwb.setVisible(false);
+}
+
+function layoutPwBubble(win, W) {
+  const nq = win.nq;
+  if (!nq.pwb || nq.pwb.webContents.isDestroyed()) return;
+  const i = nq.insets && nq.insets.view;
+  if (!nq.pwPrompt || !i || nq.frozen || nq.htmlFull != null || nq.snapping) { nq.pwb.setVisible(false); return; }
+  const w = 360;
+  nq.pwb.setBounds({ x: Math.max(i.left + 8, W - i.right - w - 10), y: i.top + 10, width: w, height: nq.pwbH || 252 });
+  nq.pwb.setVisible(true);
+}
+
+const pwbWin = (sender) => allWindows().find(w => w.nq.pwb && w.nq.pwb.webContents === sender);
+
+ipcMain.on('pwb:size', (e, h) => {
+  const win = pwbWin(e.sender);
+  if (!win) return;
+  win.nq.pwbH = Math.max(120, Math.min(420, Math.round(Number(h) || 0)));
+  applyLayout(win);
+});
+
+ipcMain.on('pwb:act', (e, act, arg) => {
+  const win = pwbWin(e.sender);
+  if (!win || !win.nq.pwPrompt) return;
+  const p = win.nq.pwPrompt;
+  if (act === 'save') {
+    const username = p.action === 'update' ? p.username : String(arg == null ? p.username : arg).trim().slice(0, 200);
+    passwords.store(p.key, username, p.password);
+  } else if (act === 'never') passwords.never(p.key);
+  closePwPrompt(win);
+  const tab = activeTab(win);
+  if (tab && tab.view && !win.nq.frozen) tab.view.webContents.focus();
+});
+
 // ---------- senha para abrir o Nanquim ----------
 // A senha nunca e guardada: so o resultado do scrypt (um embaralhamento lento de proposito, com sal),
 // que serve para conferir a senha mas nao para descobrir qual ela e.
@@ -2396,6 +2601,7 @@ let lockMode = null; // 'start' (ao abrir o Nanquim) ou 'pause' (bloqueado com o
 let browserOpen = false;
 let pendingUrls = [];
 let lockBusy = false;
+let pwAuthUntil = 0; // ver senhas salvas: depois de digitar a senha do Nanquim, fica liberado por 5 min
 
 function lockEnabled() { const d = store.lock && store.lock.data; return !!(d && d.hash && d.salt); }
 
@@ -2605,6 +2811,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  passwords.flush();
   if (!sessionLocked && browserOpen) { saveSession(true); sessionLocked = true; }
   store.flushAll();
 });
