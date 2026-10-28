@@ -4,6 +4,8 @@ const {
   app, BrowserWindow, WebContentsView, ipcMain, session, protocol, Menu, shell,
   clipboard, ClipboardItem, dialog, net, desktopCapturer, nativeImage, webContents, powerMonitor
 } = require('electron');
+// motor da castLabs: traz o Widevine, a protecao que Prime Video, Netflix, Crunchyroll e Spotify exigem
+const { components } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -2375,6 +2377,7 @@ const internalApi = {
     version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome,
     node: process.versions.node, platform: process.platform, userData: app.getPath('userData'),
     portable: PORTABLE ? { exeDir: PORTABLE.exeDir, data: PORTABLE.data } : null,
+    widevine: widevineStatus(),
     downloads: S().downloadDir || app.getPath('downloads'),
     blocklist: adblock.size, blockedTotal: adblock.total,
     isDefault: app.isDefaultProtocolClient('https')
@@ -2809,6 +2812,26 @@ function autoLockCheck() {
   try { if (powerMonitor.getSystemIdleTime() >= min * 60) lockNow(); } catch { /* ignorado */ }
 }
 
+// ---------- Widevine (videos protegidos) ----------
+let widevineRetry = null;
+async function prepareWidevine(maxWait) {
+  if (!components || typeof components.whenReady !== 'function') return;
+  try {
+    await Promise.race([components.whenReady(), new Promise((_, rej) => setTimeout(() => rej(new Error('demorou')), maxWait))]);
+  } catch {
+    // sem internet ou ainda baixando: tenta de novo em 1 minuto, sem travar nada
+    clearTimeout(widevineRetry);
+    widevineRetry = setTimeout(() => { components.whenReady().catch(() => { widevineRetry = setTimeout(() => prepareWidevine(60000), 10 * 60000); }); }, 60000);
+  }
+}
+function widevineStatus() {
+  try {
+    const st = components.status();
+    const w = Object.values(st).find(x => /widevine/i.test(x.title || ''));
+    return w ? { status: w.status, version: w.version } : null;
+  } catch { return null; }
+}
+
 // ---------- diagnostico de lentidao ----------
 // Se o navegador ficar parado mais de meio segundo, anota em logs\lentidao.txt quanto tempo ficou
 // e quais gravacoes de arquivo demoraram. Ajuda a descobrir o motivo de travadas (ex.: pendrive lento).
@@ -2880,6 +2903,10 @@ app.whenReady().then(async () => {
   dlSeq = id;
 
   await loadExtensions();
+
+  // Widevine: o modulo e baixado do Google na primeira vez (fica na pasta de dados) e atualizado sozinho.
+  // Espera no maximo 5 s para nao atrasar a abertura; sem internet, tenta de novo depois.
+  await prepareWidevine(5000);
 
   pendingUrls.push(...urlsFromArgv(process.argv));
   if (lockEnabled()) { setLockGuard(true); showLock('start'); }

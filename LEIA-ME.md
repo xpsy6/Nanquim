@@ -65,7 +65,7 @@ Os logins dos sites e as senhas salvas são protegidos pela conta do Windows do 
 
 ## Limites honestos
 
-- Netflix, Disney+ e Prime Video não tocam filmes: eles exigem uma licença paga do Google (Widevine) que só navegadores grandes recebem.
+- Vídeos protegidos (Prime Video, Netflix, Crunchyroll, Spotify): o Nanquim usa o motor da castLabs, que traz o Widevine, e cada versão é assinada por eles. Na primeira vez ele baixa o Widevine do Google (uns 10 MB). A qualidade pode ficar em HD comum, como em outros navegadores que não são o Chrome ou o Edge, e algum serviço ainda pode recusar.
 - Sincronizar favoritos e senhas entre computadores e a loja de extensões do Chrome não existem aqui.
 - A senha impede que outra pessoa abra o Nanquim. Ela não criptografa os arquivos do computador: contra alguém mexendo direto nas pastas do Windows, o que protege é a senha do próprio Windows.
 - Login do Google funciona, mas de vez em quando o Google pode pedir verificação extra por não reconhecer o navegador.
@@ -91,4 +91,4 @@ Estrutura:
 ## Créditos
 
 - Ícones de marcas: [SVG Logos](https://github.com/gilbarbara/logos) de Gil Barbara (CC0) e [Skill Icons](https://github.com/tandpfun/skill-icons) (MIT), via Iconify
-- Motor: Chromium, por meio do Electron (MIT)
+- Motor: Chromium, por meio do Electron (MIT), na versão [Electron for Content Security](https://github.com/castlabs/electron-releases) da castLabs, que inclui o Widevine

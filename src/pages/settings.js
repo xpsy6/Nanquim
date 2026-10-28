@@ -199,6 +199,12 @@ async function refreshInfo() {
   $('#data-dir').textContent = i.portable ? `Modo portátil: ${i.userData} (programa em ${i.portable.exeDir})` : i.userData;
   $('#default-info').textContent = i.isDefault ? 'O Nanquim já é o navegador padrão.' : 'Abre os links de outros programas no Nanquim.';
   $('#about').textContent = `Nanquim ${i.version} · motor Chromium ${i.chrome}`;
+  const wv = i.widevine;
+  $('#wv-info').textContent = !wv
+    ? 'Este motor não tem o Widevine, então Prime Video, Netflix e parecidos não tocam aqui.'
+    : wv.status === 'installed' || wv.version
+      ? `Widevine ${wv.version || ''} instalado: Prime Video, Netflix, Crunchyroll e Spotify podem tocar.`.replace('  ', ' ')
+      : 'Baixando o Widevine (precisa de internet). Assim que terminar, os vídeos protegidos passam a tocar.';
   if (!S || !S.downloadDir) $('#dl-dir').textContent = i.downloads;
 }
 $('#dl-change').addEventListener('click', async () => { const d = await NQ.api('chooseDownloadDir'); if (d) { $('#dl-dir').textContent = d; toast('Pasta alterada'); } });
