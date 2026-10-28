@@ -1,0 +1,56 @@
+name: Conta castLabs
+
+# Cria e confirma a conta gratuita da castLabs que assina o Nanquim (Widevine VMP).
+# Roda quando o arquivo .github/castlabs/pedido.txt muda. A primeira palavra diz o que fazer:
+#   cadastro            cria a conta (o e-mail e a senha vem dos segredos do repositorio)
+#   reenviar            manda o codigo de confirmacao de novo
+#   confirmar 123456    confirma a conta com o codigo que chegou no e-mail
+# Usa os segredos EVS_ACCOUNT_NAME, EVS_PASSWD e EVS_EMAIL (Settings, Secrets and variables, Actions).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/castlabs/pedido.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  conta:
+    runs-on: ubuntu-latest
+    env:
+      EVS_ACCOUNT_NAME: ${{ secrets.EVS_ACCOUNT_NAME }}
+      EVS_PASSWD: ${{ secrets.EVS_PASSWD }}
+      EVS_EMAIL: ${{ secrets.EVS_EMAIL }}
+      EVS_NO_ASK: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar a ferramenta da castLabs
+        run: python -m pip install --quiet castlabs-evs
+
+      - name: Executar o pedido
+        shell: bash
+        run: |
+          if [ -z "$EVS_ACCOUNT_NAME" ] || [ -z "$EVS_PASSWD" ]; then
+            echo "Faltam os segredos EVS_ACCOUNT_NAME e EVS_PASSWD no repositório."; exit 1
+          fi
+          read -r ACAO CODIGO < .github/castlabs/pedido.txt
+          case "$ACAO" in
+            cadastro)
+              if [ -z "$EVS_EMAIL" ]; then echo "Falta o segredo EVS_EMAIL no repositório."; exit 1; fi
+              python -m castlabs_evs.account -n signup -A "$EVS_ACCOUNT_NAME" -P "$EVS_PASSWD" -E "$EVS_EMAIL" -F Felipe -L Misso -O Nanquim -N 1
+              echo "Conta criada. O código de confirmação foi enviado para o e-mail cadastrado." ;;
+            reenviar)
+              python -c "import os, boto3; from botocore import UNSIGNED; from botocore.config import Config; from castlabs_evs import auth; c = boto3.client('cognito-idp', region_name=auth.DEFAULT_CLIENT_REGION, config=Config(signature_version=UNSIGNED)); c.resend_confirmation_code(ClientId=auth.DEFAULT_CLIENT_ID, Username=os.environ['EVS_ACCOUNT_NAME']); print('Código reenviado.')" ;;
+            confirmar)
+              python -m castlabs_evs.account -n confirm-signup -A "$EVS_ACCOUNT_NAME" -P "$EVS_PASSWD" -C "$CODIGO"
+              echo "Conta confirmada e funcionando." ;;
+            *)
+              echo "Pedido desconhecido: $ACAO"; exit 1 ;;
+          esac
